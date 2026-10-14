@@ -12,6 +12,7 @@ out/
 # Python und Betriebssystem
 __pycache__/
 *.py[cod]
+.venv-mqtt/
 .DS_Store
 
 # Logs
