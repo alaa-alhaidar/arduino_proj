@@ -1,0 +1,17 @@
+{
+  "name": "Sensor Campus",
+  "short_name": "Sensor Campus",
+  "description": "Mobile Steuerung und Überwachung der IoT-Sensorik",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#123b6d",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
