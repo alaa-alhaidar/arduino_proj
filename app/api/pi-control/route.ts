@@ -20,7 +20,8 @@ async function callPi(action: Action) {
       method: action === "status" ? "GET" : "POST",
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
-      signal: AbortSignal.timeout(10000),
+      // Stopping the Docker stack can legitimately take longer than 10 seconds.
+      signal: AbortSignal.timeout(60000),
     });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });

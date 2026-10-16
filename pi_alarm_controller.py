@@ -3,6 +3,7 @@
 import json
 import math
 import os
+import signal
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -135,6 +136,17 @@ def on_message(client, userdata, message):
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_connect = on_connect
 client.on_message = on_message
+
+
+def stop_cleanly(signum, frame):
+    """Switch both outputs off before systemd terminates the service."""
+    status_led.off()
+    alarm.off()
+    client.disconnect()
+
+
+signal.signal(signal.SIGTERM, stop_cleanly)
+signal.signal(signal.SIGINT, stop_cleanly)
 client.connect(MQTT_HOST, MQTT_PORT, 30)
 try:
     client.loop_forever()
