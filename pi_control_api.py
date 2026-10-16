@@ -6,7 +6,11 @@ import os
 import socket
 import subprocess
 import time
+import threading
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import paho.mqtt.client as mqtt
 
 
 HOST = os.getenv("PI_CONTROL_HOST", "127.0.0.1")
@@ -16,6 +20,9 @@ MQTT_SERVICE = "pi-mqtt.service"
 SERVICES = ("pi-alarm.service", "pi-telemetry.service")
 COMPOSE_FILE = "/home/alaa/network-monitor~/docker/compose-cloud.yaml"
 DOCKER_SERVICES = {"postgres", "sync", "pdc"}
+TELEMETRY_TOPIC = "iot/v1/nodes/pi-05/telemetry"
+ALARM_TOPIC = "iot/v1/nodes/pi-05/commands/alarm"
+ALARM_STATE_TOPIC = "iot/v1/nodes/pi-05/state/alarm"
 
 
 def service_state(service):
@@ -61,6 +68,66 @@ def current_status():
     }
 
 
+def receive_telemetry():
+    received = threading.Event()
+    result = {}
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+
+    def on_connect(connected, userdata, flags, reason_code, properties):
+        connected.subscribe(TELEMETRY_TOPIC, qos=1)
+
+    def on_message(connected, userdata, message):
+        try:
+            result["payload"] = json.loads(message.payload.decode("utf-8"))
+            received.set()
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass
+
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.connect("127.0.0.1", 1883, 10)
+    client.loop_start()
+    try:
+        if not received.wait(7):
+            raise TimeoutError("Keine MQTT-Sensordaten")
+        return result["payload"]
+    finally:
+        client.disconnect()
+        client.loop_stop()
+
+
+def publish_alarm(enabled):
+    request_id = str(uuid.uuid4())
+    confirmed = threading.Event()
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+
+    def on_connect(connected, userdata, flags, reason_code, properties):
+        connected.subscribe(ALARM_STATE_TOPIC, qos=1)
+        connected.publish(ALARM_TOPIC, json.dumps({
+            "enabled": enabled,
+            "request_id": request_id,
+        }), qos=1, retain=False)
+
+    def on_message(connected, userdata, message):
+        try:
+            state = json.loads(message.payload.decode("utf-8"))
+            if state.get("request_id") == request_id and state.get("enabled") is enabled:
+                confirmed.set()
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass
+
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.connect("127.0.0.1", 1883, 10)
+    client.loop_start()
+    try:
+        if not confirmed.wait(7):
+            raise TimeoutError("Alarmbefehl wurde nicht bestätigt")
+    finally:
+        client.disconnect()
+        client.loop_stop()
+
+
 class Handler(BaseHTTPRequestHandler):
     def send_json(self, status, data):
         payload = json.dumps(data).encode("utf-8")
@@ -80,13 +147,32 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.authorized():
             return self.reject_unauthorized()
-        if self.path != "/status":
-            return self.send_json(404, {"error": "Nicht gefunden"})
-        self.send_json(200, current_status())
+        if self.path == "/status":
+            return self.send_json(200, current_status())
+        if self.path == "/telemetry":
+            try:
+                return self.send_json(200, receive_telemetry())
+            except (OSError, TimeoutError) as error:
+                return self.send_json(503, {"error": str(error)})
+        return self.send_json(404, {"error": "Nicht gefunden"})
 
     def do_POST(self):
         if not self.authorized():
             return self.reject_unauthorized()
+        if self.path == "/alarm":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = json.loads(self.rfile.read(length))
+                enabled = body["enabled"]
+                if not isinstance(enabled, bool):
+                    raise ValueError("enabled muss ein Boolean sein")
+                publish_alarm(enabled)
+                return self.send_json(200, {"ok": True, "enabled": enabled})
+            except (KeyError, ValueError, json.JSONDecodeError) as error:
+                return self.send_json(400, {"error": str(error)})
+            except (OSError, TimeoutError) as error:
+                return self.send_json(503, {"error": str(error)})
+
         actions = {"/start": "start", "/stop": "stop"}
         action = actions.get(self.path)
         if action is None:

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/alaa/pi-control/pi_control_api.py
+ExecStart=/home/alaa/pi-alarm/venv/bin/python /home/alaa/pi-control/pi_control_api.py
 EnvironmentFile=/home/alaa/.config/sensor-campus/control.env
 Restart=always
 RestartSec=3

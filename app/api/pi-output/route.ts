@@ -17,6 +17,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "enabled muss true oder false sein" }, { status: 400 });
   }
 
+  const controlUrl = process.env.PI_CONTROL_URL;
+  const controlToken = process.env.PI_CONTROL_TOKEN;
+  if (controlUrl && controlToken) {
+    try {
+      const response = await fetch(`${controlUrl.replace(/\/$/, "")}/alarm`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${controlToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ enabled }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    } catch {
+      return NextResponse.json({ error: "Pi-Alarm über HTTPS nicht erreichbar" }, { status: 503 });
+    }
+  }
+
   const brokerUrl = process.env.MQTT_URL ?? "mqtt://127.0.0.1:18830";
   const topic = process.env.MQTT_ALARM_TOPIC ?? "iot/v1/nodes/pi-05/commands/alarm";
   const stateTopic = process.env.MQTT_ALARM_STATE_TOPIC ?? "iot/v1/nodes/pi-05/state/alarm";

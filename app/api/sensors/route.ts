@@ -31,6 +31,25 @@ function isTelemetry(value: unknown): value is Telemetry {
 }
 
 export async function GET() {
+  const controlUrl = process.env.PI_CONTROL_URL;
+  const controlToken = process.env.PI_CONTROL_TOKEN;
+  if (controlUrl && controlToken) {
+    try {
+      const response = await fetch(`${controlUrl.replace(/\/$/, "")}/telemetry`, {
+        headers: { Authorization: `Bearer ${controlToken}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000),
+      });
+      const telemetry: unknown = await response.json();
+      if (!response.ok || !isTelemetry(telemetry)) {
+        throw new Error("Ungültige Sensordaten");
+      }
+      return NextResponse.json(telemetry, { headers: { "Cache-Control": "no-store" } });
+    } catch {
+      return NextResponse.json({ error: "Keine HTTPS-Sensordaten verfügbar" }, { status: 503 });
+    }
+  }
+
   const brokerUrl = process.env.MQTT_URL ?? "mqtt://127.0.0.1:18830";
   const topic = process.env.MQTT_TELEMETRY_TOPIC ?? "iot/v1/nodes/pi-05/telemetry";
 
