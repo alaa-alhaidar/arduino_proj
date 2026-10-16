@@ -27,6 +27,9 @@ export default function Dashboard() {
   const [connection, setConnection] = useState<"ready" | "ok" | "error">("ready");
   const [controlError, setControlError] = useState<string | null>(null);
   const [lastReading, setLastReading] = useState<string | null>(null);
+  const [stationRunning, setStationRunning] = useState<boolean | null>(null);
+  const [stationPending, setStationPending] = useState(false);
+  const [stationError, setStationError] = useState<string | null>(null);
 
   useEffect(() => {
     navigator.serviceWorker?.register("/sw.js").catch(() => undefined);
@@ -46,6 +49,24 @@ export default function Dashboard() {
     }
     loadSensors();
     const timer = window.setInterval(loadSensors, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    async function loadStationStatus() {
+      try {
+        const response = await fetch("/api/pi-control", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "Status nicht verfügbar");
+        setStationRunning(data.running === true);
+        setStationError(null);
+      } catch (error) {
+        setStationRunning(null);
+        setStationError(error instanceof Error ? error.message : "Status nicht verfügbar");
+      }
+    }
+    loadStationStatus();
+    const timer = window.setInterval(loadStationStatus, 15000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -76,6 +97,25 @@ export default function Dashboard() {
     }
   }
 
+  async function controlStation(action: "start" | "stop") {
+    setStationPending(true);
+    setStationError(null);
+    try {
+      const response = await fetch("/api/pi-control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Aktion fehlgeschlagen");
+      setStationRunning(data.running === true);
+    } catch (error) {
+      setStationError(error instanceof Error ? error.message : "Aktion fehlgeschlagen");
+    } finally {
+      setStationPending(false);
+    }
+  }
+
   return (
     <main>
       <header className="topbar">
@@ -91,6 +131,19 @@ export default function Dashboard() {
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
           <div className="meter"><span style={{ width: `${sensor.progress}%` }} /></div>
         </article>)}
+      </section>
+      <section className="station-control" aria-label="Pi-5-Kontrollstation">
+        <div>
+          <span>KONTROLLSTATION PI 5</span>
+          <strong className={stationRunning ? "online" : "offline"}>
+            {stationPending ? "WIRD GESCHALTET …" : stationRunning === true ? "LÄUFT" : stationRunning === false ? "GESTOPPT" : "NICHT ERREICHBAR"}
+          </strong>
+          {stationError && <small>{stationError}</small>}
+        </div>
+        <div className="station-buttons">
+          <button type="button" disabled={stationPending || stationRunning === true} onClick={() => controlStation("start")}>PI 5 STARTEN</button>
+          <button type="button" disabled={stationPending || stationRunning === false} onClick={() => controlStation("stop")}>PI 5 STOPPEN</button>
+        </div>
       </section>
       <section className={`industrial-control ${alarmOn ? "active" : ""}`} aria-label="Alarmsteuerung">
         <div className="control-status">

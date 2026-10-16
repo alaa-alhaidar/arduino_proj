@@ -1,0 +1,12 @@
+[Unit]
+Description=Sensor Campus MQTT broker
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/alaa/pi-alarm/venv/bin/amqtt -c /home/alaa/pi-control/mqtt.yaml
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=Sensor Campus HTTPS control backend
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/alaa/pi-control/pi_control_api.py
+EnvironmentFile=/home/alaa/.config/sensor-campus/control.env
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
