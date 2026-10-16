@@ -13,7 +13,13 @@ out/
 __pycache__/
 *.py[cod]
 .venv-mqtt/
+.venv/
 .DS_Store
+
+# PlatformIO
+arduino/.pio/
+arduino/.vscode/
+arduino/include/secrets.h
 
 # Logs
 *.log

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type IconName = "thermometer" | "drop" | "gauge" | "wind";
 
@@ -16,41 +16,61 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
 }
 
 export default function Dashboard() {
-  const [tick, setTick] = useState(0);
+  const [measurements, setMeasurements] = useState<{
+    temperature_c: number;
+    pressure_hpa: number;
+    humidity_pct: number;
+    gas_resistance_ohm: number;
+  } | null>(null);
   const [alarmOn, setAlarmOn] = useState(false);
   const [pending, setPending] = useState(false);
   const [connection, setConnection] = useState<"ready" | "ok" | "error">("ready");
+  const [controlError, setControlError] = useState<string | null>(null);
+  const [lastReading, setLastReading] = useState<string | null>(null);
 
   useEffect(() => {
     navigator.serviceWorker?.register("/sw.js").catch(() => undefined);
-    const timer = window.setInterval(() => setTick((value) => value + 1), 5000);
+    async function loadSensors() {
+      try {
+        const response = await fetch("/api/sensors", { cache: "no-store" });
+        if (!response.ok) throw new Error("No data");
+        const data = await response.json();
+        setMeasurements(data.measurements);
+        setLastReading(data.sent_at ?? new Date().toISOString());
+        setConnection("ok");
+      } catch {
+        setMeasurements(null);
+        setLastReading(null);
+        setConnection("error");
+      }
+    }
+    loadSensors();
+    const timer = window.setInterval(loadSensors, 5000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const sensors = useMemo(() => {
-    const phase = tick / 12;
-    return [
-      { icon: "thermometer" as const, tone: "orange", label: "Temperatur", value: (23 + 2 * Math.sin(phase)).toFixed(1), unit: "°C", progress: 58 },
-      { icon: "drop" as const, tone: "blue", label: "Luftfeuchtigkeit", value: (48 + 5 * Math.cos(phase)).toFixed(0), unit: "%", progress: 49 },
-      { icon: "gauge" as const, tone: "violet", label: "Luftdruck", value: (1013 + 3 * Math.sin(phase / 3)).toFixed(0), unit: "hPa", progress: 68 },
-      { icon: "wind" as const, tone: "green", label: "Luftqualität", value: Math.round(120 + 10 * Math.sin(phase / 2)).toString(), unit: "kΩ", progress: 82 },
-    ];
-  }, [tick]);
+  const formatNumber = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sensors = [
+    { icon: "thermometer" as const, tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", progress: measurements ? Math.min(100, measurements.temperature_c * 2) : 0, alarm: measurements ? measurements.temperature_c >= 41 && measurements.temperature_c <= 45 : false },
+    { icon: "drop" as const, tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", progress: measurements?.humidity_pct ?? 0, alarm: false },
+    { icon: "gauge" as const, tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", progress: measurements ? Math.min(100, Math.max(0, (measurements.pressure_hpa - 950) / 1.1)) : 0, alarm: false },
+    { icon: "wind" as const, tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", progress: measurements ? Math.min(100, measurements.gas_resistance_ohm / 1500) : 0, alarm: false },
+  ];
 
-  async function controlPi() {
-    const nextState = !alarmOn;
+  async function controlPi(enabled: boolean) {
     setPending(true);
+    setControlError(null);
     try {
       const response = await fetch("/api/pi-output", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: nextState }),
+        body: JSON.stringify({ enabled }),
       });
-      if (!response.ok) throw new Error("MQTT command failed");
-      setAlarmOn(nextState);
-      setConnection("ok");
-    } catch {
-      setConnection("error");
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Schaltbefehl fehlgeschlagen");
+      setAlarmOn(enabled);
+    } catch (error) {
+      setControlError(error instanceof Error ? error.message : "Schaltbefehl fehlgeschlagen");
     } finally {
       setPending(false);
     }
@@ -61,27 +81,58 @@ export default function Dashboard() {
       <header className="topbar">
         <div className="brand"><div className="brandmark"><span /><span /><span /></div><strong>Sensor Campus</strong></div>
         <div className="top-actions">
-          <div className={`live ${connection === "error" ? "offline" : ""}`}><i /> {connection === "error" ? "Pi nicht erreichbar" : "Pi 5"}</div>
-          <button className={`sensor-button ${alarmOn ? "on" : ""}`} type="button" disabled={pending} onClick={controlPi}>
-            {pending ? "Wird gesendet …" : alarmOn ? "LED + Buzzer ausschalten" : "LED + Buzzer einschalten"}
-          </button>
+          <div className={`live ${connection !== "ok" ? "offline" : ""}`} title={lastReading ? `Letzter Messwert: ${new Date(lastReading).toLocaleString("de-DE")}` : undefined}><i /> {connection === "ok" ? "Nano über Pi 5" : connection === "error" ? "Keine Sensordaten" : "Verbindung …"}</div>
         </div>
       </header>
       <section className="sensor-grid" aria-label="Sensorwerte">
-        {sensors.map((sensor) => <article className="sensor-card" key={sensor.label}>
+        {sensors.map((sensor) => <article className={`sensor-card ${sensor.alarm ? "alarm" : ""}`} key={sensor.label}>
           <div className={`sensor-icon ${sensor.tone}`}><Icon name={sensor.icon}/></div>
-          <div className="sensor-heading"><span>{sensor.label}</span><i>Live</i></div>
+          <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
           <div className="meter"><span style={{ width: `${sensor.progress}%` }} /></div>
         </article>)}
       </section>
+      <section className={`industrial-control ${alarmOn ? "active" : ""}`} aria-label="Alarmsteuerung">
+        <div className="control-status">
+          <span>ALARMANLAGE</span>
+          <strong><i />{pending ? "SCHALTET …" : controlError ? "STÖRUNG" : alarmOn ? "ALARM AKTIV" : "BEREIT"}</strong>
+          {controlError && <small>{controlError}</small>}
+        </div>
+        <div className="control-buttons">
+          <button className="industrial-button stop" type="button" disabled={pending} onClick={() => controlPi(false)}>
+            <span className="button-symbol">■</span>
+            <span>ALARM<br/>AUSSCHALTEN</span>
+          </button>
+          <button className="industrial-button alarm-trigger" type="button" disabled={pending} onClick={() => controlPi(true)}>
+            <span className="button-symbol">!</span>
+            <span>ALARM<br/>AUSLÖSEN</span>
+          </button>
+        </div>
+      </section>
       <style jsx>{`
         .live.offline { color: #7d8794; background: #edf0f3; }
         .live.offline i { background: #9aa3ad; box-shadow: none; }
-        .sensor-button { border: 0; border-radius: 9px; padding: 9px 13px; background: #123b6d; color: #fff; font-size: 11px; font-weight: 700; }
-        .sensor-button.on { background: #b83232; color: #fff; }
-        .sensor-button:disabled { opacity: .6; cursor: wait; }
-        @media (max-width: 540px) { .sensor-button { padding: 8px 10px; } }
+        .sensor-card.alarm { background: #fff0f0; border-color: #e34848; box-shadow: 0 4px 18px rgba(190, 34, 34, .14); }
+        .sensor-card.alarm .sensor-icon { color: #fff; background: #d93636; }
+        .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
+        .sensor-card.alarm .meter { background: #f2caca; }
+        .sensor-card.alarm .meter span { background: #d93636; }
+        .industrial-control { max-width: 1124px; margin: 0 auto 42px; padding: 18px; background: #d8dde2; border: 2px solid #aeb6bf; border-radius: 4px; box-shadow: inset 0 1px #fff, 0 3px 8px rgba(19,35,52,.12); display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+        .control-status { min-width: 180px; padding: 12px 16px; background: #202a30; border: 2px inset #7d878d; color: #dce7e9; }
+        .control-status span { display: block; color: #96a5aa; font: 700 10px monospace; letter-spacing: 1.2px; margin-bottom: 7px; }
+        .control-status strong { display: flex; align-items: center; gap: 8px; font: 700 14px monospace; letter-spacing: .7px; }
+        .control-status i { width: 10px; height: 10px; border-radius: 50%; background: #31c278; box-shadow: 0 0 8px #31c278; }
+        .control-status small { display: block; max-width: 270px; margin-top: 8px; color: #ff9b96; font: 10px/1.35 monospace; }
+        .industrial-control.active .control-status i { background: #ff3b30; box-shadow: 0 0 9px #ff3b30; }
+        .industrial-control.active .control-status strong { color: #ff7770; }
+        .control-buttons { display: grid; grid-template-columns: repeat(2, 170px); gap: 14px; }
+        .industrial-button { min-height: 82px; border-radius: 3px; border: 2px solid; color: #fff; display: flex; align-items: center; justify-content: center; gap: 12px; font: 800 12px/1.35 Arial,sans-serif; letter-spacing: .7px; text-align: left; box-shadow: inset 0 2px rgba(255,255,255,.22), inset 0 -3px rgba(0,0,0,.2), 0 3px 0 #697178; }
+        .industrial-button:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 2px rgba(0,0,0,.18), 0 1px 0 #697178; }
+        .industrial-button:disabled { opacity: .42; cursor: not-allowed; }
+        .industrial-button.stop { background: #287b49; border-color: #175832; }
+        .industrial-button.alarm-trigger { background: #c92f2f; border-color: #8e1d1d; }
+        .button-symbol { width: 36px; height: 36px; border: 2px solid rgba(255,255,255,.75); display: grid; place-items: center; font-size: 20px; border-radius: 2px; }
+        @media (max-width: 650px) { .industrial-control { margin: 0 16px 24px; align-items: stretch; flex-direction: column; }.control-status { min-width: 0; }.control-buttons { grid-template-columns: 1fr 1fr; }.industrial-button { min-height: 76px; }.button-symbol { display: none; } }
       `}</style>
     </main>
   );

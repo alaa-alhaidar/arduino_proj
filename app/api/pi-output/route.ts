@@ -1,4 +1,5 @@
 import { connectAsync } from "mqtt";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -18,18 +19,55 @@ export async function POST(request: Request) {
 
   const brokerUrl = process.env.MQTT_URL ?? "mqtt://127.0.0.1:18830";
   const topic = process.env.MQTT_ALARM_TOPIC ?? "iot/v1/nodes/pi-05/commands/alarm";
+  const stateTopic = process.env.MQTT_ALARM_STATE_TOPIC ?? "iot/v1/nodes/pi-05/state/alarm";
+  const requestId = randomUUID();
+  let client: Awaited<ReturnType<typeof connectAsync>> | undefined;
 
   try {
-    const client = await connectAsync(brokerUrl, {
+    const connectedClient = await connectAsync(brokerUrl, {
       connectTimeout: 3000,
       reconnectPeriod: 0,
       username: process.env.MQTT_USERNAME,
       password: process.env.MQTT_PASSWORD,
     });
-    await client.publishAsync(topic, JSON.stringify({ enabled }), { qos: 1, retain: true });
-    await client.endAsync();
+    client = connectedClient;
+    await connectedClient.subscribeAsync(stateTopic, { qos: 1 });
+
+    const confirmation = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("Keine Bestätigung vom Pi")),
+        5000,
+      );
+      connectedClient.on("message", (receivedTopic, payload) => {
+        if (receivedTopic !== stateTopic) return;
+        try {
+          const state = JSON.parse(payload.toString()) as {
+            enabled?: unknown;
+            request_id?: unknown;
+          };
+          if (state.request_id === requestId && state.enabled === enabled) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        } catch {
+          // Andere oder alte retained Statusmeldungen werden ignoriert.
+        }
+      });
+    });
+
+    await connectedClient.publishAsync(
+      topic,
+      JSON.stringify({ enabled, request_id: requestId }),
+      { qos: 1, retain: false },
+    );
+    await confirmation;
     return NextResponse.json({ ok: true, enabled });
   } catch {
-    return NextResponse.json({ error: "Raspberry Pi nicht erreichbar" }, { status: 503 });
+    return NextResponse.json(
+      { error: "Raspberry Pi hat den Schaltbefehl nicht bestätigt" },
+      { status: 503 },
+    );
+  } finally {
+    await client?.endAsync().catch(() => undefined);
   }
 }

@@ -1,6 +1,6 @@
 # Sensor Campus PWA
 
-Eine einfache Next.js-PWA zur Anzeige von Sensorwerten und zur Steuerung der LED-/Buzzer-Alarmschaltung auf einem Raspberry Pi 5 über MQTT.
+Eine Next.js-PWA zur Anzeige der Sensordaten eines Arduino Nano, die über den Raspberry Pi 5 per MQTT bereitgestellt werden, sowie zur Steuerung der LED-/Buzzer-Alarmschaltung.
 
 ## Lokal starten
 
@@ -18,4 +18,29 @@ Die Next.js-API veröffentlicht Schaltbefehle im MQTT-Thema:
 iot/v1/nodes/pi-05/commands/alarm
 ```
 
-Wenn Next.js auf dem Mac läuft, verwendet die Beispielkonfiguration den vorhandenen SSH-Tunnel auf Port `18830`.
+Die PWA liest die Nano-Sensordaten aus:
+
+```text
+iot/v1/nodes/pi-05/telemetry
+```
+
+Der Pi 5 muss dort retained JSON-Nachrichten in diesem Format veröffentlichen:
+
+```json
+{
+  "sent_at": "2026-10-16T12:00:00Z",
+  "source": "nano",
+  "measurements": {
+    "temperature_c": 23.4,
+    "pressure_hpa": 1013.2,
+    "humidity_pct": 48.1,
+    "gas_resistance_ohm": 120000
+  }
+}
+```
+
+## Pi-5-Alarmdienst
+
+`pi_alarm_controller.py` läuft als Benutzer-Dienst `pi-alarm.service` auf dem Pi 5. Er empfängt die PWA-Befehle, übergibt sie an den vorhandenen Netzwerkmonitor und bestätigt den ausgeführten Zustand per MQTT. Die Next.js-PWA bleibt auf dem Mac.
+
+Wenn Next.js auf dem Mac läuft, verbindet es sich über `MQTT_URL` direkt mit dem MQTT-Broker des Pi 5 im lokalen Netz.
