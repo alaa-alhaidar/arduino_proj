@@ -1,0 +1,13 @@
+[Unit]
+Description=HTTPS tunnel for Sensor Campus Pi control
+After=network-online.target pi-control-api.service
+Requires=pi-control-api.service
+
+[Service]
+Type=simple
+ExecStart=/home/alaa/.local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8765
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
