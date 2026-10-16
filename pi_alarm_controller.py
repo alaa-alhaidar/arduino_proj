@@ -46,10 +46,8 @@ status_led = DigitalOutputDevice(
 status_timer = None
 
 
-def telemetry_is_healthy(payload):
-    """Only real, complete sensor measurements count as healthy telemetry."""
-    if payload.get("source") not in {"sensor", "nano-bme688"}:
-        return False
+def telemetry_is_valid(payload):
+    """Complete measurements count as data flow, including temporary fake data."""
     measurements = payload.get("measurements")
     if not isinstance(measurements, dict):
         return False
@@ -72,7 +70,7 @@ def handle_telemetry(message):
     global status_timer
     try:
         payload = json.loads(message.payload.decode("utf-8"))
-        healthy = not message.retain and telemetry_is_healthy(payload)
+        healthy = not message.retain and telemetry_is_valid(payload)
     except (UnicodeError, json.JSONDecodeError, AttributeError):
         healthy = False
 
