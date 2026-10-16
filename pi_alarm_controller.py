@@ -1,4 +1,4 @@
-"""Receive PWA alarm commands on the Pi and pass them to the monitor GUI."""
+"""Receive PWA alarm commands and switch the Pi alarm GPIO."""
 
 import json
 import os
@@ -7,6 +7,8 @@ from pathlib import Path
 import time
 
 import paho.mqtt.client as mqtt
+from gpiozero import DigitalOutputDevice
+from gpiozero.pins.lgpio import LGPIOFactory
 
 
 MQTT_HOST = os.getenv("MQTT_HOST", "127.0.0.1")
@@ -17,6 +19,18 @@ STATE_FILE = Path(os.getenv(
     "PWA_ALARM_STATE_FILE",
     "/home/alaa/network-monitor~/data/pwa-alarm.json",
 ))
+ALARM_PIN = int(os.getenv("ALARM_PIN", "27"))
+ALARM_ACTIVE_HIGH = os.getenv("ALARM_ACTIVE_HIGH", "true").lower() not in {
+    "0", "false", "no", "off",
+}
+
+# Raspberry Pi 5 GPIO is handled by lgpio. The alarm always starts switched off.
+alarm = DigitalOutputDevice(
+    ALARM_PIN,
+    active_high=ALARM_ACTIVE_HIGH,
+    initial_value=False,
+    pin_factory=LGPIOFactory(),
+)
 
 
 def write_state(enabled):
@@ -51,6 +65,10 @@ def on_message(client, userdata, message):
         enabled = command["enabled"]
         if not isinstance(enabled, bool):
             raise TypeError("enabled muss true oder false sein")
+        if enabled:
+            alarm.on()
+        else:
+            alarm.off()
         write_state(enabled)
         publish_confirmation(client, enabled, command.get("request_id"))
         print("PWA-Alarm:", "EIN" if enabled else "AUS", flush=True)
@@ -62,4 +80,8 @@ client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_connect = on_connect
 client.on_message = on_message
 client.connect(MQTT_HOST, MQTT_PORT, 30)
-client.loop_forever()
+try:
+    client.loop_forever()
+finally:
+    alarm.off()
+    alarm.close()
