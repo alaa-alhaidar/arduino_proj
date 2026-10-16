@@ -14,6 +14,8 @@ PORT = int(os.getenv("PI_CONTROL_PORT", "8765"))
 TOKEN = os.environ["PI_CONTROL_TOKEN"]
 MQTT_SERVICE = "pi-mqtt.service"
 SERVICES = ("pi-alarm.service", "pi-telemetry.service")
+COMPOSE_FILE = "/home/alaa/network-monitor~/docker/compose-cloud.yaml"
+DOCKER_SERVICES = {"postgres", "sync", "pdc"}
 
 
 def service_state(service):
@@ -35,11 +37,26 @@ def mqtt_available():
         return False
 
 
+def docker_services_running():
+    result = subprocess.run(
+        ["docker", "compose", "-f", COMPOSE_FILE, "--profile", "pdc",
+         "ps", "--status", "running", "--services"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    return DOCKER_SERVICES.issubset(set(result.stdout.splitlines()))
+
+
 def current_status():
     services = {service: service_state(service) for service in SERVICES}
+    mqtt = mqtt_available()
+    docker = docker_services_running()
     return {
-        "running": all(state == "active" for state in services.values()) and mqtt_available(),
+        "running": all(state == "active" for state in services.values()) and mqtt and docker,
         "mqtt": "active" if mqtt_available() else "unavailable",
+        "docker": "active" if docker else "incomplete",
         "services": services,
     }
 
@@ -76,6 +93,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(404, {"error": "Nicht gefunden"})
         try:
             if action == "start":
+                subprocess.run(
+                    ["docker", "compose", "-f", COMPOSE_FILE, "--profile", "pdc",
+                     "up", "-d", "postgres", "sync", "pdc"],
+                    timeout=60,
+                    check=True,
+                )
                 if not mqtt_available():
                     subprocess.run(
                         ["systemctl", "--user", "start", MQTT_SERVICE],
@@ -91,6 +114,12 @@ class Handler(BaseHTTPRequestHandler):
                 subprocess.run(
                     ["systemctl", "--user", "stop", *SERVICES, MQTT_SERVICE],
                     timeout=20,
+                    check=True,
+                )
+                subprocess.run(
+                    ["docker", "compose", "-f", COMPOSE_FILE, "--profile", "pdc",
+                     "stop", "pdc", "sync", "postgres"],
+                    timeout=60,
                     check=True,
                 )
         except (subprocess.SubprocessError, OSError) as error:
