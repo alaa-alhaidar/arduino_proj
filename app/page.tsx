@@ -76,6 +76,8 @@ export default function Dashboard() {
   const [tolerancePercent, setTolerancePercent] = useState(5);
   const [now, setNow] = useState(() => Date.now());
   const [alarmOn, setAlarmOn] = useState(false);
+  const [automaticAlarm, setAutomaticAlarm] = useState(false);
+  const [alarmAcknowledged, setAlarmAcknowledged] = useState(false);
   const [pendingAlarm, setPendingAlarm] = useState<"on" | "off" | null>(null);
   const [connection, setConnection] = useState<"ready" | "ok" | "error">("ready");
   const [controlError, setControlError] = useState<string | null>(null);
@@ -103,6 +105,8 @@ export default function Dashboard() {
           setSetpoints(data.alarm_control.setpoints);
           setTolerancePercent(data.alarm_control.tolerance_percent ?? 5);
           setAlarmOn(data.alarm_control.alarm_active === true);
+          setAutomaticAlarm(data.alarm_control.automatic_alarm === true);
+          setAlarmAcknowledged(data.alarm_control.automatic_alarm_acknowledged === true);
         }
         setConnection("ok");
       } catch {
@@ -179,6 +183,7 @@ export default function Dashboard() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Schaltbefehl fehlgeschlagen");
       setAlarmOn(enabled);
+      setAlarmAcknowledged(!enabled && automaticAlarm);
     } catch (error) {
       setControlError(error instanceof Error ? error.message : "Schaltbefehl fehlgeschlagen");
     } finally {
@@ -256,7 +261,9 @@ export default function Dashboard() {
                     ? "STÖRUNG"
                     : alarmOn
                       ? "ALARM AKTIV"
-                      : "BEREIT"}</strong>
+                      : automaticAlarm && alarmAcknowledged
+                        ? "ALARM QUITTIERT"
+                        : "BEREIT"}</strong>
           {controlError && <small>{controlError}</small>}
         </div>
         <div className="control-buttons">
