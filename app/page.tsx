@@ -21,24 +21,37 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
   if (values.length < 2) {
     return <div className="sparkline empty">Verlauf wird aufgebaut …</div>;
   }
-  const minimum = Math.min(...values);
-  const maximum = Math.max(...values);
+  const target = values[0];
+  const tolerance = Math.abs(target) * 0.05;
+  const lowerLimit = target - tolerance;
+  const upperLimit = target + tolerance;
+  const minimum = Math.min(...values, lowerLimit);
+  const maximum = Math.max(...values, upperLimit);
   const range = maximum - minimum || 1;
   const axisNumber = (value: number) => value.toLocaleString("de-DE", {
     maximumFractionDigits: unit === "hPa" || unit === "kΩ" ? 1 : 1,
   });
+  const yPosition = (value: number) => height - bottom
+    - ((value - minimum) / range) * (height - top - bottom);
   const points = values.map((value, index) => {
     const x = left + index * ((width - left - right) / (values.length - 1));
-    const y = height - bottom - ((value - minimum) / range) * (height - top - bottom);
+    const y = yPosition(value);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
   const area = `${left},${height - bottom} ${points} ${width - right},${height - bottom}`;
+  const upperY = yPosition(upperLimit);
+  const lowerY = yPosition(lowerLimit);
   return (
-    <svg className={`sparkline ${tone}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: Verlauf der letzten ${values.length} Messungen`}>
+    <svg className={`sparkline ${tone}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: Verlauf der letzten ${values.length} Messungen, Sollbereich plus oder minus 5 Prozent`}>
+      <title>Sollwert {axisNumber(target)} {unit}, erlaubter Bereich {axisNumber(lowerLimit)} bis {axisNumber(upperLimit)} {unit}</title>
+      <rect className="tolerance-band" x={left} y={upperY} width={width - left - right} height={Math.max(1, lowerY - upperY)} />
+      <line className="tolerance-limit" x1={left} y1={upperY} x2={width - right} y2={upperY} />
+      <line className="tolerance-limit" x1={left} y1={lowerY} x2={width - right} y2={lowerY} />
       <line className="chart-axis" x1={left} y1={top} x2={left} y2={height - bottom} />
       <line className="chart-axis" x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
       <polygon points={area} />
       <polyline points={points} />
+      <text className="tolerance-text" x={width - right - 3} y={(upperY + lowerY) / 2 + 3} textAnchor="end">Soll ±5 %</text>
       <text className="axis-value" x={left - 5} y={top + 3} textAnchor="end">{axisNumber(maximum)} {unit}</text>
       <text className="axis-value" x={left - 5} y={height - bottom + 3} textAnchor="end">{axisNumber(minimum)} {unit}</text>
       <text className="axis-time" x={left} y={height - 4}>älter</text>
