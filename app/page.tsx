@@ -3,6 +3,14 @@
 import { useEffect, useState } from "react";
 
 type IconName = "thermometer" | "drop" | "gauge" | "wind";
+type Measurements = {
+  temperature_c: number;
+  pressure_hpa: number;
+  humidity_pct: number;
+  gas_resistance_ohm: number;
+};
+
+type HistoryPoint = Measurements & { receivedAt: number; sampleId: string };
 
 function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
@@ -15,13 +23,34 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   return <svg {...common}>{paths[name]}</svg>;
 }
 
+function Sparkline({ values, tone, label }: { values: number[]; tone: string; label: string }) {
+  const width = 220;
+  const height = 48;
+  const padding = 3;
+  if (values.length < 2) {
+    return <div className="sparkline empty">Verlauf wird aufgebaut …</div>;
+  }
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const range = maximum - minimum || 1;
+  const points = values.map((value, index) => {
+    const x = padding + index * ((width - padding * 2) / (values.length - 1));
+    const y = height - padding - ((value - minimum) / range) * (height - padding * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const area = `${padding},${height} ${points} ${width - padding},${height}`;
+  return (
+    <svg className={`sparkline ${tone}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: Verlauf der letzten ${values.length} Messungen`} preserveAspectRatio="none">
+      <polygon points={area} />
+      <polyline points={points} />
+    </svg>
+  );
+}
+
 export default function Dashboard() {
-  const [measurements, setMeasurements] = useState<{
-    temperature_c: number;
-    pressure_hpa: number;
-    humidity_pct: number;
-    gas_resistance_ohm: number;
-  } | null>(null);
+  const [measurements, setMeasurements] = useState<Measurements | null>(null);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [now, setNow] = useState(() => Date.now());
   const [alarmOn, setAlarmOn] = useState(false);
   const [pending, setPending] = useState(false);
   const [connection, setConnection] = useState<"ready" | "ok" | "error">("ready");
@@ -39,16 +68,26 @@ export default function Dashboard() {
         if (!response.ok) throw new Error("No data");
         const data = await response.json();
         setMeasurements(data.measurements);
-        setLastReading(data.sent_at ?? new Date().toISOString());
+        const receivedAt = Date.now();
+        const timestamp = data.sent_at || new Date(receivedAt).toISOString();
+        const sampleId = `${data.boot_id ?? "sensor"}:${data.sequence ?? timestamp}`;
+        setLastReading(timestamp);
+        setHistory((current) => current.at(-1)?.sampleId === sampleId
+          ? current
+          : [...current, { ...data.measurements, receivedAt, sampleId }].slice(-30));
         setConnection("ok");
       } catch {
         setMeasurements(null);
-        setLastReading(null);
         setConnection("error");
       }
     }
     loadSensors();
     const timer = window.setInterval(loadSensors, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -71,11 +110,20 @@ export default function Dashboard() {
   }, []);
 
   const formatNumber = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const lastReadingDate = lastReading ? new Date(lastReading) : null;
+  const lastReadingAge = lastReadingDate && !Number.isNaN(lastReadingDate.getTime())
+    ? Math.max(0, Math.floor((now - lastReadingDate.getTime()) / 1000))
+    : null;
+  const lastReadingText = lastReadingAge === null
+    ? "Noch keine Messung"
+    : lastReadingAge < 60
+      ? `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${lastReadingAge} s`
+      : `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${Math.floor(lastReadingAge / 60)} min`;
   const sensors = [
-    { icon: "thermometer" as const, tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", progress: measurements ? Math.min(100, measurements.temperature_c * 2) : 0, alarm: measurements ? measurements.temperature_c >= 41 && measurements.temperature_c <= 45 : false },
-    { icon: "drop" as const, tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", progress: measurements?.humidity_pct ?? 0, alarm: false },
-    { icon: "gauge" as const, tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", progress: measurements ? Math.min(100, Math.max(0, (measurements.pressure_hpa - 950) / 1.1)) : 0, alarm: false },
-    { icon: "wind" as const, tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", progress: measurements ? Math.min(100, measurements.gas_resistance_ohm / 1500) : 0, alarm: false },
+    { icon: "thermometer" as const, tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", values: history.map((point) => point.temperature_c), alarm: measurements ? measurements.temperature_c >= 41 && measurements.temperature_c <= 45 : false },
+    { icon: "drop" as const, tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", values: history.map((point) => point.humidity_pct), alarm: false },
+    { icon: "gauge" as const, tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", values: history.map((point) => point.pressure_hpa), alarm: false },
+    { icon: "wind" as const, tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", values: history.map((point) => point.gas_resistance_ohm / 1000), alarm: false },
   ];
 
   async function controlPi(enabled: boolean) {
@@ -121,7 +169,10 @@ export default function Dashboard() {
       <header className="topbar">
         <div className="brand"><div className="brandmark"><span /><span /><span /></div><strong>Sensor Campus</strong></div>
         <div className="top-actions">
-          <div className={`live ${connection !== "ok" ? "offline" : ""}`} title={lastReading ? `Letzter Messwert: ${new Date(lastReading).toLocaleString("de-DE")}` : undefined}><i /> {connection === "ok" ? "Nano über Pi 5" : connection === "error" ? "Keine Sensordaten" : "Verbindung …"}</div>
+          <div className="connection-info">
+            <div className={`live ${connection !== "ok" ? "offline" : ""}`}><i /> {connection === "ok" ? "Nano über Pi 5" : connection === "error" ? "Keine Sensordaten" : "Verbindung …"}</div>
+            <time dateTime={lastReading ?? undefined} title={lastReadingDate ? lastReadingDate.toLocaleString("de-DE") : undefined}>{lastReadingText}</time>
+          </div>
         </div>
       </header>
       <section className="sensor-grid" aria-label="Sensorwerte">
@@ -129,7 +180,7 @@ export default function Dashboard() {
           <div className={`sensor-icon ${sensor.tone}`}><Icon name={sensor.icon}/></div>
           <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
-          <div className="meter"><span style={{ width: `${sensor.progress}%` }} /></div>
+          <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} />
         </article>)}
       </section>
       <section className="station-control" aria-label="Pi-5-Kontrollstation">
@@ -170,22 +221,22 @@ export default function Dashboard() {
         .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
         .sensor-card.alarm .meter { background: #f2caca; }
         .sensor-card.alarm .meter span { background: #d93636; }
-        .industrial-control { max-width: 1124px; margin: 0 auto 42px; padding: 18px; background: #d8dde2; border: 2px solid #aeb6bf; border-radius: 4px; box-shadow: inset 0 1px #fff, 0 3px 8px rgba(19,35,52,.12); display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-        .control-status { min-width: 180px; padding: 12px 16px; background: #202a30; border: 2px inset #7d878d; color: #dce7e9; }
+        .industrial-control { max-width: 1124px; margin: 0 auto 42px; padding: 12px 14px; background: #d8dde2; border: 2px solid #aeb6bf; border-radius: 4px; box-shadow: inset 0 1px #fff, 0 3px 8px rgba(19,35,52,.12); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        .control-status { min-width: 170px; padding: 9px 12px; background: #202a30; border: 2px inset #7d878d; color: #dce7e9; }
         .control-status span { display: block; color: #96a5aa; font: 700 10px monospace; letter-spacing: 1.2px; margin-bottom: 7px; }
         .control-status strong { display: flex; align-items: center; gap: 8px; font: 700 14px monospace; letter-spacing: .7px; }
         .control-status i { width: 10px; height: 10px; border-radius: 50%; background: #31c278; box-shadow: 0 0 8px #31c278; }
         .control-status small { display: block; max-width: 270px; margin-top: 8px; color: #ff9b96; font: 10px/1.35 monospace; }
         .industrial-control.active .control-status i { background: #ff3b30; box-shadow: 0 0 9px #ff3b30; }
         .industrial-control.active .control-status strong { color: #ff7770; }
-        .control-buttons { display: grid; grid-template-columns: repeat(2, 170px); gap: 14px; }
-        .industrial-button { min-height: 82px; border-radius: 3px; border: 2px solid; color: #fff; display: flex; align-items: center; justify-content: center; gap: 12px; font: 800 12px/1.35 Arial,sans-serif; letter-spacing: .7px; text-align: left; box-shadow: inset 0 2px rgba(255,255,255,.22), inset 0 -3px rgba(0,0,0,.2), 0 3px 0 #697178; }
+        .control-buttons { display: grid; grid-template-columns: repeat(2, 138px); gap: 10px; }
+        .industrial-button { min-height: 58px; border-radius: 3px; border: 2px solid; color: #fff; display: flex; align-items: center; justify-content: center; gap: 9px; font: 800 10px/1.3 Arial,sans-serif; letter-spacing: .6px; text-align: left; box-shadow: inset 0 2px rgba(255,255,255,.22), inset 0 -3px rgba(0,0,0,.2), 0 3px 0 #697178; }
         .industrial-button:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 2px rgba(0,0,0,.18), 0 1px 0 #697178; }
         .industrial-button:disabled { opacity: .42; cursor: not-allowed; }
         .industrial-button.stop { background: #287b49; border-color: #175832; }
         .industrial-button.alarm-trigger { background: #c92f2f; border-color: #8e1d1d; }
-        .button-symbol { width: 36px; height: 36px; border: 2px solid rgba(255,255,255,.75); display: grid; place-items: center; font-size: 20px; border-radius: 2px; }
-        @media (max-width: 650px) { .industrial-control { margin: 0 16px 24px; align-items: stretch; flex-direction: column; }.control-status { min-width: 0; }.control-buttons { grid-template-columns: 1fr 1fr; }.industrial-button { min-height: 76px; }.button-symbol { display: none; } }
+        .button-symbol { width: 27px; height: 27px; border: 2px solid rgba(255,255,255,.75); display: grid; place-items: center; font-size: 15px; border-radius: 2px; }
+        @media (max-width: 650px) { .industrial-control { margin: 0 16px 24px; align-items: stretch; flex-direction: column; }.control-status { min-width: 0; }.control-buttons { grid-template-columns: 1fr 1fr; }.industrial-button { min-height: 54px; }.button-symbol { display: none; } }
       `}</style>
     </main>
   );
