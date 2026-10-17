@@ -13,8 +13,8 @@ type HistoryPoint = Measurements & { receivedAt: number; sampleId: string };
 
 function Sparkline({ values, tone, label, unit }: { values: number[]; tone: string; label: string; unit: string }) {
   const width = 240;
-  const height = 76;
-  const left = 48;
+  const height = 88;
+  const left = 52;
   const right = 4;
   const top = 7;
   const bottom = 19;
@@ -25,8 +25,15 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
   const tolerance = Math.abs(target) * 0.05;
   const lowerLimit = target - tolerance;
   const upperLimit = target + tolerance;
-  const minimum = Math.min(...values, lowerLimit);
-  const maximum = Math.max(...values, upperLimit);
+  const rawMinimum = Math.min(...values, lowerLimit);
+  const rawMaximum = Math.max(...values, upperLimit);
+  const scalePadding = Math.max(
+    (upperLimit - lowerLimit) * 0.3,
+    (rawMaximum - rawMinimum) * 0.08,
+    0.01,
+  );
+  const minimum = rawMinimum - scalePadding;
+  const maximum = rawMaximum + scalePadding;
   const range = maximum - minimum || 1;
   const axisNumber = (value: number) => value.toLocaleString("de-DE", {
     maximumFractionDigits: unit === "hPa" || unit === "kΩ" ? 1 : 1,
@@ -52,6 +59,8 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
       <polygon points={area} />
       <polyline points={points} />
       <text className="tolerance-text" x={width - right - 3} y={(upperY + lowerY) / 2 + 3} textAnchor="end">Soll ±5 %</text>
+      <text className="tolerance-value" x={left - 5} y={upperY + 3} textAnchor="end">{axisNumber(upperLimit)}</text>
+      <text className="tolerance-value" x={left - 5} y={lowerY + 3} textAnchor="end">{axisNumber(lowerLimit)}</text>
       <text className="axis-value" x={left - 5} y={top + 3} textAnchor="end">{axisNumber(maximum)} {unit}</text>
       <text className="axis-value" x={left - 5} y={height - bottom + 3} textAnchor="end">{axisNumber(minimum)} {unit}</text>
       <text className="axis-time" x={left} y={height - 4}>älter</text>
