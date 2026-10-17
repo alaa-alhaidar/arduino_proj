@@ -64,7 +64,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [alarmOn, setAlarmOn] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [pendingAlarm, setPendingAlarm] = useState<"on" | "off" | null>(null);
   const [connection, setConnection] = useState<"ready" | "ok" | "error">("ready");
   const [controlError, setControlError] = useState<string | null>(null);
   const [lastReading, setLastReading] = useState<string | null>(null);
@@ -145,8 +145,8 @@ export default function Dashboard() {
   ];
 
   async function controlPi(enabled: boolean) {
-    if (stationRunning !== true) return;
-    setPending(true);
+    if (stationRunning !== true || pendingAlarm !== null) return;
+    setPendingAlarm(enabled ? "on" : "off");
     setControlError(null);
     try {
       const response = await fetch("/api/pi-output", {
@@ -160,7 +160,7 @@ export default function Dashboard() {
     } catch (error) {
       setControlError(error instanceof Error ? error.message : "Schaltbefehl fehlgeschlagen");
     } finally {
-      setPending(false);
+      setPendingAlarm(null);
     }
   }
 
@@ -232,7 +232,7 @@ export default function Dashboard() {
               ? "AUS"
               : stationRunning === null
                 ? "NICHT ERREICHBAR"
-                : pending
+                : pendingAlarm
                   ? "SCHALTET …"
                   : controlError
                     ? "STÖRUNG"
@@ -242,11 +242,11 @@ export default function Dashboard() {
           {controlError && <small>{controlError}</small>}
         </div>
         <div className="control-buttons">
-          <button className="industrial-button stop" type="button" disabled={pending || stationRunning !== true} onClick={() => controlPi(false)}>
+          <button className="industrial-button stop" type="button" disabled={pendingAlarm === "off" || stationRunning !== true} aria-disabled={pendingAlarm !== null || stationRunning !== true} onClick={() => controlPi(false)}>
             <span className="button-symbol">■</span>
             <span>ALARM<br/>AUSSCHALTEN</span>
           </button>
-          <button className="industrial-button alarm-trigger" type="button" disabled={pending || stationRunning !== true} onClick={() => controlPi(true)}>
+          <button className="industrial-button alarm-trigger" type="button" disabled={pendingAlarm === "on" || stationRunning !== true} aria-disabled={pendingAlarm !== null || stationRunning !== true} onClick={() => controlPi(true)}>
             <span className="button-symbol">!</span>
             <span>ALARM<br/>AUSLÖSEN</span>
           </button>
