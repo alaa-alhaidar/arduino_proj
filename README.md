@@ -39,8 +39,6 @@ Der Pi 5 muss dort retained JSON-Nachrichten in diesem Format veröffentlichen:
 }
 ```
 
-## Pi-5-Alarmdienst
+## Pi-5-Dienste
 
-`pi_alarm_controller.py` läuft als Benutzer-Dienst `pi-alarm.service` auf dem Pi 5. Er empfängt die PWA-Befehle, übergibt sie an den vorhandenen Netzwerkmonitor und bestätigt den ausgeführten Zustand per MQTT. Die Next.js-PWA bleibt auf dem Mac.
-
-Wenn Next.js auf dem Mac läuft, verbindet es sich über `MQTT_URL` direkt mit dem MQTT-Broker des Pi 5 im lokalen Netz.
+Die Python-Dienste für GPIO, MQTT und die Kontroll-API laufen separat auf dem Pi 5. Dieses Repository enthält nur das Next.js-PWA-Dashboard. Wenn Next.js lokal auf dem Mac läuft, verbindet es sich über `MQTT_URL` direkt mit dem MQTT-Broker des Pi 5.
