@@ -11,7 +11,7 @@ type Measurements = {
 
 type HistoryPoint = Measurements & { receivedAt: number; sampleId: string };
 
-function Sparkline({ values, tone, label, unit }: { values: number[]; tone: string; label: string; unit: string }) {
+function Sparkline({ values, tone, label, unit, setpoint, tolerancePercent = 5 }: { values: number[]; tone: string; label: string; unit: string; setpoint?: number; tolerancePercent?: number }) {
   const width = 240;
   const height = 88;
   const left = 52;
@@ -21,8 +21,8 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
   if (values.length < 2) {
     return <div className="sparkline empty">Verlauf wird aufgebaut …</div>;
   }
-  const target = values[0];
-  const tolerance = Math.abs(target) * 0.05;
+  const target = setpoint ?? values[0];
+  const tolerance = Math.abs(target) * tolerancePercent / 100;
   const lowerLimit = target - tolerance;
   const upperLimit = target + tolerance;
   const rawMinimum = Math.min(...values, lowerLimit);
@@ -49,7 +49,7 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
   const upperY = yPosition(upperLimit);
   const lowerY = yPosition(lowerLimit);
   return (
-    <svg className={`sparkline ${tone}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: Verlauf der letzten ${values.length} Messungen, Sollbereich plus oder minus 5 Prozent`}>
+    <svg className={`sparkline ${tone}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: Verlauf der letzten ${values.length} Messungen, Sollbereich plus oder minus ${tolerancePercent} Prozent`}>
       <title>Sollwert {axisNumber(target)} {unit}, erlaubter Bereich {axisNumber(lowerLimit)} bis {axisNumber(upperLimit)} {unit}</title>
       <rect className="tolerance-band" x={left} y={upperY} width={width - left - right} height={Math.max(1, lowerY - upperY)} />
       <line className="tolerance-limit" x1={left} y1={upperY} x2={width - right} y2={upperY} />
@@ -58,7 +58,7 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
       <line className="chart-axis" x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
       <polygon points={area} />
       <polyline points={points} />
-      <text className="tolerance-text" x={width - right - 3} y={(upperY + lowerY) / 2 + 3} textAnchor="end">Soll ±5 %</text>
+      <text className="tolerance-text" x={width - right - 3} y={(upperY + lowerY) / 2 + 3} textAnchor="end">Soll ±{tolerancePercent} %</text>
       <text className="tolerance-value" x={left - 5} y={upperY + 3} textAnchor="end">{axisNumber(upperLimit)}</text>
       <text className="tolerance-value" x={left - 5} y={lowerY + 3} textAnchor="end">{axisNumber(lowerLimit)}</text>
       <text className="axis-value" x={left - 5} y={top + 3} textAnchor="end">{axisNumber(maximum)} {unit}</text>
@@ -72,6 +72,8 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
 export default function Dashboard() {
   const [measurements, setMeasurements] = useState<Measurements | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [setpoints, setSetpoints] = useState<Measurements | null>(null);
+  const [tolerancePercent, setTolerancePercent] = useState(5);
   const [now, setNow] = useState(() => Date.now());
   const [alarmOn, setAlarmOn] = useState(false);
   const [pendingAlarm, setPendingAlarm] = useState<"on" | "off" | null>(null);
@@ -97,6 +99,11 @@ export default function Dashboard() {
         setHistory((current) => current.at(-1)?.sampleId === sampleId
           ? current
           : [...current, { ...data.measurements, receivedAt, sampleId }].slice(-30));
+        if (data.alarm_control?.setpoints) {
+          setSetpoints(data.alarm_control.setpoints);
+          setTolerancePercent(data.alarm_control.tolerance_percent ?? 5);
+          setAlarmOn(data.alarm_control.alarm_active === true);
+        }
         setConnection("ok");
       } catch {
         setMeasurements(null);
@@ -138,6 +145,11 @@ export default function Dashboard() {
   }, []);
 
   const formatNumber = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const outsideTolerance = (value: number, target: number | undefined) => {
+    if (target === undefined) return false;
+    const tolerance = Math.abs(target) * tolerancePercent / 100;
+    return value < target - tolerance || value > target + tolerance;
+  };
   const lastReadingDate = lastReading ? new Date(lastReading) : null;
   const lastReadingAge = lastReadingDate && !Number.isNaN(lastReadingDate.getTime())
     ? Math.max(0, Math.floor((now - lastReadingDate.getTime()) / 1000))
@@ -148,10 +160,10 @@ export default function Dashboard() {
       ? `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${lastReadingAge} s`
       : `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${Math.floor(lastReadingAge / 60)} min`;
   const sensors = [
-    { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", values: history.map((point) => point.temperature_c), alarm: measurements ? measurements.temperature_c >= 41 && measurements.temperature_c <= 45 : false },
-    { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", values: history.map((point) => point.humidity_pct), alarm: false },
-    { tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", values: history.map((point) => point.pressure_hpa), alarm: false },
-    { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", values: history.map((point) => point.gas_resistance_ohm / 1000), alarm: false },
+    { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", values: history.map((point) => point.temperature_c), setpoint: setpoints?.temperature_c, alarm: measurements ? outsideTolerance(measurements.temperature_c, setpoints?.temperature_c) : false },
+    { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", values: history.map((point) => point.humidity_pct), setpoint: setpoints?.humidity_pct, alarm: measurements ? outsideTolerance(measurements.humidity_pct, setpoints?.humidity_pct) : false },
+    { tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", values: history.map((point) => point.pressure_hpa), setpoint: setpoints?.pressure_hpa, alarm: measurements ? outsideTolerance(measurements.pressure_hpa, setpoints?.pressure_hpa) : false },
+    { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", values: history.map((point) => point.gas_resistance_ohm / 1000), setpoint: setpoints ? setpoints.gas_resistance_ohm / 1000 : undefined, alarm: measurements ? outsideTolerance(measurements.gas_resistance_ohm, setpoints?.gas_resistance_ohm) : false },
   ];
 
   async function controlPi(enabled: boolean) {
@@ -213,7 +225,7 @@ export default function Dashboard() {
         {sensors.map((sensor) => <article className={`sensor-card ${sensor.alarm ? "alarm" : ""}`} key={sensor.label}>
           <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
-          <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} unit={sensor.unit} />
+          <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} unit={sensor.unit} setpoint={sensor.setpoint} tolerancePercent={tolerancePercent} />
         </article>)}
       </section>
       <section className="station-control" aria-label="Pi-5-Kontrollstation">
