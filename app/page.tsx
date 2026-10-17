@@ -109,10 +109,16 @@ export default function Dashboard() {
         const response = await fetch("/api/pi-control", { cache: "no-store" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Status nicht verfügbar");
-        setStationRunning(data.running === true);
+        const running = data.running === true;
+        setStationRunning(running);
+        if (!running) {
+          setAlarmOn(false);
+          setControlError(null);
+        }
         setStationError(null);
       } catch (error) {
         setStationRunning(null);
+        setAlarmOn(false);
         setStationError(error instanceof Error ? error.message : "Status nicht verfügbar");
       }
     }
@@ -139,6 +145,7 @@ export default function Dashboard() {
   ];
 
   async function controlPi(enabled: boolean) {
+    if (stationRunning !== true) return;
     setPending(true);
     setControlError(null);
     try {
@@ -168,7 +175,12 @@ export default function Dashboard() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Aktion fehlgeschlagen");
-      setStationRunning(data.running === true);
+      const running = data.running === true;
+      setStationRunning(running);
+      if (!running) {
+        setAlarmOn(false);
+        setControlError(null);
+      }
     } catch (error) {
       setStationError(error instanceof Error ? error.message : "Aktion fehlgeschlagen");
     } finally {
@@ -208,18 +220,30 @@ export default function Dashboard() {
           <button type="button" disabled={stationPending || stationRunning === false} onClick={() => controlStation("stop")}>PI 5 STOPPEN</button>
         </div>
       </section>
-      <section className={`industrial-control ${alarmOn ? "active" : ""}`} aria-label="Alarmsteuerung">
+      <section className={`industrial-control ${stationRunning !== true ? "offline" : alarmOn ? "active" : ""}`} aria-label="Alarmsteuerung">
         <div className="control-status">
           <span>ALARMANLAGE</span>
-          <strong><i />{pending ? "SCHALTET …" : controlError ? "STÖRUNG" : alarmOn ? "ALARM AKTIV" : "BEREIT"}</strong>
+          <strong><i />{stationPending
+            ? "PI WIRD GESCHALTET …"
+            : stationRunning === false
+              ? "AUS"
+              : stationRunning === null
+                ? "NICHT ERREICHBAR"
+                : pending
+                  ? "SCHALTET …"
+                  : controlError
+                    ? "STÖRUNG"
+                    : alarmOn
+                      ? "ALARM AKTIV"
+                      : "BEREIT"}</strong>
           {controlError && <small>{controlError}</small>}
         </div>
         <div className="control-buttons">
-          <button className="industrial-button stop" type="button" disabled={pending} onClick={() => controlPi(false)}>
+          <button className="industrial-button stop" type="button" disabled={pending || stationRunning !== true} onClick={() => controlPi(false)}>
             <span className="button-symbol">■</span>
             <span>ALARM<br/>AUSSCHALTEN</span>
           </button>
-          <button className="industrial-button alarm-trigger" type="button" disabled={pending} onClick={() => controlPi(true)}>
+          <button className="industrial-button alarm-trigger" type="button" disabled={pending || stationRunning !== true} onClick={() => controlPi(true)}>
             <span className="button-symbol">!</span>
             <span>ALARM<br/>AUSLÖSEN</span>
           </button>
@@ -241,6 +265,8 @@ export default function Dashboard() {
         .control-status small { display: block; max-width: 270px; margin-top: 8px; color: #ff9b96; font: 10px/1.35 monospace; }
         .industrial-control.active .control-status i { background: #ff3b30; box-shadow: 0 0 9px #ff3b30; }
         .industrial-control.active .control-status strong { color: #ff7770; }
+        .industrial-control.offline .control-status i { background: #7f8b91; box-shadow: none; }
+        .industrial-control.offline .control-status strong { color: #aeb9bd; }
         .control-buttons { display: grid; grid-template-columns: repeat(2, 138px); gap: 10px; }
         .industrial-button { min-height: 58px; border-radius: 3px; border: 2px solid; color: #fff; display: flex; align-items: center; justify-content: center; gap: 9px; font: 800 10px/1.3 Arial,sans-serif; letter-spacing: .6px; text-align: left; box-shadow: inset 0 2px rgba(255,255,255,.22), inset 0 -3px rgba(0,0,0,.2), 0 3px 0 #697178; }
         .industrial-button:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 2px rgba(0,0,0,.18), 0 1px 0 #697178; }
