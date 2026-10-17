@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-type IconName = "thermometer" | "drop" | "gauge" | "wind";
 type Measurements = {
   temperature_c: number;
   pressure_hpa: number;
@@ -11,17 +10,6 @@ type Measurements = {
 };
 
 type HistoryPoint = Measurements & { receivedAt: number; sampleId: string };
-
-function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
-  const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
-  const paths: Record<IconName, React.ReactNode> = {
-    thermometer: <><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0Z"/><path d="M12 12V6"/></>,
-    drop: <path d="M12 2.8S6 9.3 6 14a6 6 0 0 0 12 0c0-4.7-6-11.2-6-11.2Z"/>,
-    gauge: <><path d="M4 14a8 8 0 1 1 16 0"/><path d="m12 14 4-4"/><path d="M5 18h14"/></>,
-    wind: <><path d="M3 8h11a2 2 0 1 0-2-2"/><path d="M3 12h16a2 2 0 1 1-2 2"/><path d="M3 16h8"/></>,
-  };
-  return <svg {...common}>{paths[name]}</svg>;
-}
 
 function Sparkline({ values, tone, label, unit }: { values: number[]; tone: string; label: string; unit: string }) {
   const width = 240;
@@ -138,10 +126,10 @@ export default function Dashboard() {
       ? `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${lastReadingAge} s`
       : `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${Math.floor(lastReadingAge / 60)} min`;
   const sensors = [
-    { icon: "thermometer" as const, tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", values: history.map((point) => point.temperature_c), alarm: measurements ? measurements.temperature_c >= 41 && measurements.temperature_c <= 45 : false },
-    { icon: "drop" as const, tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", values: history.map((point) => point.humidity_pct), alarm: false },
-    { icon: "gauge" as const, tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", values: history.map((point) => point.pressure_hpa), alarm: false },
-    { icon: "wind" as const, tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", values: history.map((point) => point.gas_resistance_ohm / 1000), alarm: false },
+    { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", values: history.map((point) => point.temperature_c), alarm: measurements ? measurements.temperature_c >= 41 && measurements.temperature_c <= 45 : false },
+    { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", values: history.map((point) => point.humidity_pct), alarm: false },
+    { tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", values: history.map((point) => point.pressure_hpa), alarm: false },
+    { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", values: history.map((point) => point.gas_resistance_ohm / 1000), alarm: false },
   ];
 
   async function controlPi(enabled: boolean) {
@@ -201,11 +189,7 @@ export default function Dashboard() {
       </header>
       <section className="sensor-grid" aria-label="Sensorwerte">
         {sensors.map((sensor) => <article className={`sensor-card ${sensor.alarm ? "alarm" : ""}`} key={sensor.label}>
-          <div className="sensor-meta">
-            <div className={`sensor-icon ${sensor.tone}`}><Icon name={sensor.icon} size={19}/></div>
-            <i className="sensor-state">{measurements ? "Live" : "Offline"}</i>
-          </div>
-          <div className="sensor-heading"><span>{sensor.label}</span></div>
+          <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
           <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} unit={sensor.unit} />
         </article>)}
