@@ -23,26 +23,38 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   return <svg {...common}>{paths[name]}</svg>;
 }
 
-function Sparkline({ values, tone, label }: { values: number[]; tone: string; label: string }) {
-  const width = 220;
-  const height = 48;
-  const padding = 3;
+function Sparkline({ values, tone, label, unit }: { values: number[]; tone: string; label: string; unit: string }) {
+  const width = 240;
+  const height = 76;
+  const left = 48;
+  const right = 4;
+  const top = 7;
+  const bottom = 19;
   if (values.length < 2) {
     return <div className="sparkline empty">Verlauf wird aufgebaut …</div>;
   }
   const minimum = Math.min(...values);
   const maximum = Math.max(...values);
   const range = maximum - minimum || 1;
+  const axisNumber = (value: number) => value.toLocaleString("de-DE", {
+    maximumFractionDigits: unit === "hPa" || unit === "kΩ" ? 1 : 1,
+  });
   const points = values.map((value, index) => {
-    const x = padding + index * ((width - padding * 2) / (values.length - 1));
-    const y = height - padding - ((value - minimum) / range) * (height - padding * 2);
+    const x = left + index * ((width - left - right) / (values.length - 1));
+    const y = height - bottom - ((value - minimum) / range) * (height - top - bottom);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
-  const area = `${padding},${height} ${points} ${width - padding},${height}`;
+  const area = `${left},${height - bottom} ${points} ${width - right},${height - bottom}`;
   return (
-    <svg className={`sparkline ${tone}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: Verlauf der letzten ${values.length} Messungen`} preserveAspectRatio="none">
+    <svg className={`sparkline ${tone}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: Verlauf der letzten ${values.length} Messungen`}>
+      <line className="chart-axis" x1={left} y1={top} x2={left} y2={height - bottom} />
+      <line className="chart-axis" x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
       <polygon points={area} />
       <polyline points={points} />
+      <text className="axis-value" x={left - 5} y={top + 3} textAnchor="end">{axisNumber(maximum)} {unit}</text>
+      <text className="axis-value" x={left - 5} y={height - bottom + 3} textAnchor="end">{axisNumber(minimum)} {unit}</text>
+      <text className="axis-time" x={left} y={height - 4}>älter</text>
+      <text className="axis-time" x={width - right} y={height - 4} textAnchor="end">jetzt</text>
     </svg>
   );
 }
@@ -180,7 +192,7 @@ export default function Dashboard() {
           <div className={`sensor-icon ${sensor.tone}`}><Icon name={sensor.icon}/></div>
           <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
-          <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} />
+          <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} unit={sensor.unit} />
         </article>)}
       </section>
       <section className="station-control" aria-label="Pi-5-Kontrollstation">
