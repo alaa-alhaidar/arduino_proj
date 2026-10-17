@@ -201,8 +201,11 @@ export default function Dashboard() {
       </header>
       <section className="sensor-grid" aria-label="Sensorwerte">
         {sensors.map((sensor) => <article className={`sensor-card ${sensor.alarm ? "alarm" : ""}`} key={sensor.label}>
-          <div className={`sensor-icon ${sensor.tone}`}><Icon name={sensor.icon}/></div>
-          <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
+          <div className="sensor-meta">
+            <div className={`sensor-icon ${sensor.tone}`}><Icon name={sensor.icon} size={19}/></div>
+            <i className="sensor-state">{measurements ? "Live" : "Offline"}</i>
+          </div>
+          <div className="sensor-heading"><span>{sensor.label}</span></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
           <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} unit={sensor.unit} />
         </article>)}
