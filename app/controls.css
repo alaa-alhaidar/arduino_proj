@@ -30,7 +30,7 @@
 .station-buttons { display: flex; gap: 10px; }
 .station-buttons button { min-height: 34px; padding: 0 13px; border: 0; border-radius: 6px; color: #fff; background: #287b49; font-size: 10px; font-weight: 800; letter-spacing: .45px; }
 .station-buttons button:last-child { background: #a93434; }
-.station-buttons button:disabled { opacity: .4; cursor: not-allowed; }
+.station-buttons button:disabled { color: #78828c; background: #d5dbe1; opacity: 1; cursor: not-allowed; }
 
 @media (max-width: 650px) {
   .industrial-control { margin: 0 16px 24px; align-items: stretch; flex-direction: column; }

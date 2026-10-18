@@ -24,7 +24,10 @@ async function callPi(action: Action) {
       signal: AbortSignal.timeout(60000),
     });
     const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
   } catch {
     return NextResponse.json(
       { error: "Pi-Kontrollstation über HTTPS nicht erreichbar" },

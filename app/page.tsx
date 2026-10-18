@@ -128,9 +128,11 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (stationPending) return;
+
     async function loadStationStatus() {
       try {
-        const response = await fetch("/api/pi-control", { cache: "no-store" });
+        const response = await fetch(`/api/pi-control?t=${Date.now()}`, { cache: "no-store" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Status nicht verfügbar");
         const running = data.running === true;
@@ -147,9 +149,9 @@ export default function Dashboard() {
       }
     }
     loadStationStatus();
-    const timer = window.setInterval(loadStationStatus, 15000);
+    const timer = window.setInterval(loadStationStatus, 2000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [stationPending]);
 
   const formatNumber = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const lastReadingDate = lastReading ? new Date(lastReading) : null;
@@ -242,8 +244,8 @@ export default function Dashboard() {
           {stationError && <small>{stationError}</small>}
         </div>
         <div className="station-buttons">
-          <button type="button" disabled={stationPending || stationRunning === true} onClick={() => controlStation("start")}>PI 5 STARTEN</button>
-          <button type="button" disabled={stationPending || stationRunning === false} onClick={() => controlStation("stop")}>PI 5 STOPPEN</button>
+          <button type="button" disabled={stationPending || stationRunning !== false} onClick={() => controlStation("start")}>PI 5 STARTEN</button>
+          <button type="button" disabled={stationPending || stationRunning !== true} onClick={() => controlStation("stop")}>PI 5 STOPPEN</button>
         </div>
       </section>
       <section className={`industrial-control ${stationRunning !== true ? "offline" : alarmOn ? "active" : ""}`} aria-label="Alarmsteuerung">
