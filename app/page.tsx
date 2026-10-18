@@ -16,7 +16,7 @@ type ChartPoint = { value: number; receivedAt: number };
 const CHART_WINDOW_MS = 60_000;
 const SENSOR_POLL_MS = 1_000;
 
-function Sparkline({ data, tone, label, unit, limits, now }: { data: ChartPoint[]; tone: string; label: string; unit: string; limits?: Range; now: number }) {
+function Sparkline({ data, tone, label, unit, limits }: { data: ChartPoint[]; tone: string; label: string; unit: string; limits?: Range }) {
   const width = 240;
   const height = 88;
   const left = 52;
@@ -40,15 +40,12 @@ function Sparkline({ data, tone, label, unit, limits, now }: { data: ChartPoint[
   });
   const yPosition = (value: number) => height - bottom
     - ((value - minimum) / range) * (height - top - bottom);
-  const points = data.map((point) => {
-    const age = Math.min(CHART_WINDOW_MS, Math.max(0, now - point.receivedAt));
-    const x = left + (1 - age / CHART_WINDOW_MS) * (width - left - right);
+  const points = data.map((point, index) => {
+    const x = left + index * ((width - left - right) / (data.length - 1));
     const y = yPosition(point.value);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
-  const firstX = left + (1 - Math.min(CHART_WINDOW_MS, Math.max(0, now - data[0].receivedAt)) / CHART_WINDOW_MS) * (width - left - right);
-  const lastX = left + (1 - Math.min(CHART_WINDOW_MS, Math.max(0, now - data.at(-1)!.receivedAt)) / CHART_WINDOW_MS) * (width - left - right);
-  const area = `${firstX.toFixed(1)},${height - bottom} ${points} ${lastX.toFixed(1)},${height - bottom}`;
+  const area = `${left},${height - bottom} ${points} ${width - right},${height - bottom}`;
   const upperY = yPosition(upperLimit);
   const lowerY = yPosition(lowerLimit);
   return (
@@ -233,7 +230,7 @@ export default function Dashboard() {
         {sensors.map((sensor) => <article className="sensor-card" key={sensor.label}>
           <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
-          <Sparkline data={sensor.data} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} now={chartNow} />
+          <Sparkline data={sensor.data} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} />
         </article>)}
       </section>
       <section className="station-control" aria-label="Pi-5-Kontrollstation">
