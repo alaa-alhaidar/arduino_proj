@@ -9,7 +9,3 @@
 .sparkline.empty{height:88px}
 @media(max-width:540px){.sensor-grid{padding-top:18px}.sensor-card{padding:12px 10px 9px}.reading{margin:6px 0;font-size:20px}.sparkline.empty{height:70px}}
 
-.sparkline .tolerance-band{fill:#f4c542;opacity:.42}
-.sparkline .tolerance-limit{stroke:#c99e00;stroke-width:1.5;stroke-dasharray:4 2;vector-effect:non-scaling-stroke}
-.sparkline .tolerance-text{fill:#856800;font-size:7px;font-weight:700}
-.sparkline .tolerance-value{fill:#856800;font-size:7px;font-weight:700}
