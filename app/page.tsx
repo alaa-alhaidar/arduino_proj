@@ -10,8 +10,10 @@ type Measurements = {
 };
 
 type HistoryPoint = Measurements & { receivedAt: number; sampleId: string };
+type Range = { min: number; max: number };
+type Ranges = Record<keyof Measurements, Range>;
 
-function Sparkline({ values, tone, label, unit }: { values: number[]; tone: string; label: string; unit: string }) {
+function Sparkline({ values, tone, label, unit, limits }: { values: number[]; tone: string; label: string; unit: string; limits?: Range }) {
   const width = 240;
   const height = 88;
   const left = 52;
@@ -21,9 +23,11 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
   if (values.length < 2) {
     return <div className="sparkline empty">Verlauf wird aufgebaut …</div>;
   }
-  const rawMinimum = Math.min(...values);
-  const rawMaximum = Math.max(...values);
-  const scalePadding = Math.max((rawMaximum - rawMinimum) * 0.1, Math.abs(rawMaximum) * 0.005, 0.01);
+  const lowerLimit = limits?.min ?? Math.min(...values);
+  const upperLimit = limits?.max ?? Math.max(...values);
+  const rawMinimum = Math.min(...values, lowerLimit);
+  const rawMaximum = Math.max(...values, upperLimit);
+  const scalePadding = Math.max((upperLimit - lowerLimit) * 0.3, (rawMaximum - rawMinimum) * 0.08, 0.01);
   const minimum = rawMinimum - scalePadding;
   const maximum = rawMaximum + scalePadding;
   const range = maximum - minimum || 1;
@@ -38,12 +42,24 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
   const area = `${left},${height - bottom} ${points} ${width - right},${height - bottom}`;
+  const upperY = yPosition(upperLimit);
+  const lowerY = yPosition(lowerLimit);
   return (
-    <svg className={`sparkline ${tone}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: Verlauf der letzten ${values.length} Messungen`}>
+    <svg className={`sparkline ${tone}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}: Verlauf mit dem auf dem Pi eingestellten Bereich`}>
+      {limits && <>
+        <rect className="tolerance-band" x={left} y={upperY} width={width - left - right} height={Math.max(1, lowerY - upperY)} />
+        <line className="tolerance-limit" x1={left} y1={upperY} x2={width - right} y2={upperY} />
+        <line className="tolerance-limit" x1={left} y1={lowerY} x2={width - right} y2={lowerY} />
+      </>}
       <line className="chart-axis" x1={left} y1={top} x2={left} y2={height - bottom} />
       <line className="chart-axis" x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
       <polygon points={area} />
       <polyline points={points} />
+      {limits && <>
+        <text className="tolerance-text" x={width - right - 3} y={(upperY + lowerY) / 2 + 3} textAnchor="end">Pi-Bereich</text>
+        <text className="tolerance-value" x={left - 5} y={upperY + 3} textAnchor="end">{axisNumber(upperLimit)}</text>
+        <text className="tolerance-value" x={left - 5} y={lowerY + 3} textAnchor="end">{axisNumber(lowerLimit)}</text>
+      </>}
       <text className="axis-value" x={left - 5} y={top + 3} textAnchor="end">{axisNumber(maximum)} {unit}</text>
       <text className="axis-value" x={left - 5} y={height - bottom + 3} textAnchor="end">{axisNumber(minimum)} {unit}</text>
       <text className="axis-time" x={left} y={height - 4}>älter</text>
@@ -55,6 +71,7 @@ function Sparkline({ values, tone, label, unit }: { values: number[]; tone: stri
 export default function Dashboard() {
   const [measurements, setMeasurements] = useState<Measurements | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [ranges, setRanges] = useState<Ranges | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [alarmOn, setAlarmOn] = useState(false);
   const [automaticAlarm, setAutomaticAlarm] = useState(false);
@@ -83,6 +100,7 @@ export default function Dashboard() {
           ? current
           : [...current, { ...data.measurements, receivedAt, sampleId }].slice(-30));
         if (data.alarm_control) {
+          if (data.alarm_control.ranges) setRanges(data.alarm_control.ranges);
           setAlarmOn(data.alarm_control.alarm_active === true);
           setAutomaticAlarm(data.alarm_control.automatic_alarm === true);
           setAlarmAcknowledged(data.alarm_control.automatic_alarm_acknowledged === true);
@@ -138,10 +156,10 @@ export default function Dashboard() {
       ? `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${lastReadingAge} s`
       : `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${Math.floor(lastReadingAge / 60)} min`;
   const sensors = [
-    { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", values: history.map((point) => point.temperature_c) },
-    { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", values: history.map((point) => point.humidity_pct) },
-    { tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", values: history.map((point) => point.pressure_hpa) },
-    { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", values: history.map((point) => point.gas_resistance_ohm / 1000) },
+    { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", values: history.map((point) => point.temperature_c), limits: ranges?.temperature_c },
+    { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", values: history.map((point) => point.humidity_pct), limits: ranges?.humidity_pct },
+    { tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", values: history.map((point) => point.pressure_hpa), limits: ranges?.pressure_hpa },
+    { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", values: history.map((point) => point.gas_resistance_ohm / 1000), limits: ranges?.gas_resistance_ohm ? { min: ranges.gas_resistance_ohm.min / 1000, max: ranges.gas_resistance_ohm.max / 1000 } : undefined },
   ];
 
   async function controlPi(enabled: boolean) {
@@ -204,7 +222,7 @@ export default function Dashboard() {
         {sensors.map((sensor) => <article className="sensor-card" key={sensor.label}>
           <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
-          <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} unit={sensor.unit} />
+          <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} />
         </article>)}
       </section>
       <section className="station-control" aria-label="Pi-5-Kontrollstation">

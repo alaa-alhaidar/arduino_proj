@@ -30,13 +30,14 @@ function isTelemetry(value: unknown): value is Telemetry {
   ].every((key) => typeof data[key] === "number" && Number.isFinite(data[key]));
 }
 
-function withoutPiRanges(telemetry: Telemetry) {
+function telemetryForDashboard(telemetry: Telemetry) {
   const alarm = (telemetry as Telemetry & {
     alarm_control?: Record<string, unknown>;
   }).alarm_control;
   if (!alarm) return telemetry;
 
   const {
+    ranges,
     automatic_alarm,
     automatic_alarm_acknowledged,
     manual_alarm,
@@ -46,6 +47,7 @@ function withoutPiRanges(telemetry: Telemetry) {
   return {
     ...telemetry,
     alarm_control: {
+      ranges,
       automatic_alarm,
       automatic_alarm_acknowledged,
       manual_alarm,
@@ -69,7 +71,7 @@ export async function GET() {
       if (!response.ok || !isTelemetry(telemetry)) {
         throw new Error("Ungültige Sensordaten");
       }
-      return NextResponse.json(withoutPiRanges(telemetry), { headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json(telemetryForDashboard(telemetry), { headers: { "Cache-Control": "no-store" } });
     } catch {
       return NextResponse.json({ error: "Keine HTTPS-Sensordaten verfügbar" }, { status: 503 });
     }
