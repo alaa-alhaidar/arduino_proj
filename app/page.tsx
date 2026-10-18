@@ -12,17 +12,20 @@ type Measurements = {
 type HistoryPoint = Measurements & { receivedAt: number; sampleId: string };
 type Range = { min: number; max: number };
 type Ranges = Record<keyof Measurements, Range>;
+type ChartPoint = { value: number; receivedAt: number };
+const CHART_WINDOW_MS = 60_000;
 
-function Sparkline({ values, tone, label, unit, limits }: { values: number[]; tone: string; label: string; unit: string; limits?: Range }) {
+function Sparkline({ data, tone, label, unit, limits, now }: { data: ChartPoint[]; tone: string; label: string; unit: string; limits?: Range; now: number }) {
   const width = 240;
   const height = 88;
   const left = 52;
   const right = 4;
   const top = 7;
   const bottom = 19;
-  if (values.length < 2) {
+  if (data.length < 2) {
     return <div className="sparkline empty">Verlauf wird aufgebaut …</div>;
   }
+  const values = data.map((point) => point.value);
   const lowerLimit = limits?.min ?? Math.min(...values);
   const upperLimit = limits?.max ?? Math.max(...values);
   const rawMinimum = Math.min(...values, lowerLimit);
@@ -36,12 +39,15 @@ function Sparkline({ values, tone, label, unit, limits }: { values: number[]; to
   });
   const yPosition = (value: number) => height - bottom
     - ((value - minimum) / range) * (height - top - bottom);
-  const points = values.map((value, index) => {
-    const x = left + index * ((width - left - right) / (values.length - 1));
-    const y = yPosition(value);
+  const points = data.map((point) => {
+    const age = Math.min(CHART_WINDOW_MS, Math.max(0, now - point.receivedAt));
+    const x = left + (1 - age / CHART_WINDOW_MS) * (width - left - right);
+    const y = yPosition(point.value);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
-  const area = `${left},${height - bottom} ${points} ${width - right},${height - bottom}`;
+  const firstX = left + (1 - Math.min(CHART_WINDOW_MS, Math.max(0, now - data[0].receivedAt)) / CHART_WINDOW_MS) * (width - left - right);
+  const lastX = left + (1 - Math.min(CHART_WINDOW_MS, Math.max(0, now - data.at(-1)!.receivedAt)) / CHART_WINDOW_MS) * (width - left - right);
+  const area = `${firstX.toFixed(1)},${height - bottom} ${points} ${lastX.toFixed(1)},${height - bottom}`;
   const upperY = yPosition(upperLimit);
   const lowerY = yPosition(lowerLimit);
   return (
@@ -62,7 +68,7 @@ function Sparkline({ values, tone, label, unit, limits }: { values: number[]; to
       </>}
       <text className="axis-value" x={left - 5} y={top + 3} textAnchor="end">{axisNumber(maximum)} {unit}</text>
       <text className="axis-value" x={left - 5} y={height - bottom + 3} textAnchor="end">{axisNumber(minimum)} {unit}</text>
-      <text className="axis-time" x={left} y={height - 4}>älter</text>
+      <text className="axis-time" x={left} y={height - 4}>−1 min</text>
       <text className="axis-time" x={width - right} y={height - 4} textAnchor="end">jetzt</text>
     </svg>
   );
@@ -96,9 +102,12 @@ export default function Dashboard() {
         const timestamp = data.sent_at || new Date(receivedAt).toISOString();
         const sampleId = `${data.boot_id ?? "sensor"}:${data.sequence ?? timestamp}`;
         setLastReading(timestamp);
-        setHistory((current) => current.at(-1)?.sampleId === sampleId
-          ? current
-          : [...current, { ...data.measurements, receivedAt, sampleId }].slice(-30));
+        setHistory((current) => {
+          const recent = current.filter((point) => receivedAt - point.receivedAt <= CHART_WINDOW_MS);
+          return recent.at(-1)?.sampleId === sampleId
+            ? recent
+            : [...recent, { ...data.measurements, receivedAt, sampleId }];
+        });
         if (data.alarm_control) {
           if (data.alarm_control.ranges) setRanges(data.alarm_control.ranges);
           setAlarmOn(data.alarm_control.alarm_active === true);
@@ -155,11 +164,12 @@ export default function Dashboard() {
     : lastReadingAge < 60
       ? `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${lastReadingAge} s`
       : `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${Math.floor(lastReadingAge / 60)} min`;
+  const visibleHistory = history.filter((point) => now - point.receivedAt <= CHART_WINDOW_MS);
   const sensors = [
-    { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", values: history.map((point) => point.temperature_c), limits: ranges?.temperature_c },
-    { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", values: history.map((point) => point.humidity_pct), limits: ranges?.humidity_pct },
-    { tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", values: history.map((point) => point.pressure_hpa), limits: ranges?.pressure_hpa },
-    { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", values: history.map((point) => point.gas_resistance_ohm / 1000), limits: ranges?.gas_resistance_ohm ? { min: ranges.gas_resistance_ohm.min / 1000, max: ranges.gas_resistance_ohm.max / 1000 } : undefined },
+    { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", data: visibleHistory.map((point) => ({ value: point.temperature_c, receivedAt: point.receivedAt })), limits: ranges?.temperature_c },
+    { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", data: visibleHistory.map((point) => ({ value: point.humidity_pct, receivedAt: point.receivedAt })), limits: ranges?.humidity_pct },
+    { tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", data: visibleHistory.map((point) => ({ value: point.pressure_hpa, receivedAt: point.receivedAt })), limits: ranges?.pressure_hpa },
+    { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", data: visibleHistory.map((point) => ({ value: point.gas_resistance_ohm / 1000, receivedAt: point.receivedAt })), limits: ranges?.gas_resistance_ohm ? { min: ranges.gas_resistance_ohm.min / 1000, max: ranges.gas_resistance_ohm.max / 1000 } : undefined },
   ];
 
   async function controlPi(enabled: boolean) {
@@ -222,7 +232,7 @@ export default function Dashboard() {
         {sensors.map((sensor) => <article className="sensor-card" key={sensor.label}>
           <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
-          <Sparkline values={sensor.values} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} />
+          <Sparkline data={sensor.data} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} now={now} />
         </article>)}
       </section>
       <section className="station-control" aria-label="Pi-5-Kontrollstation">
