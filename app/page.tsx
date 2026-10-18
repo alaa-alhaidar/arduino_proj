@@ -103,10 +103,9 @@ export default function Dashboard() {
         const sampleId = `${data.boot_id ?? "sensor"}:${data.sequence ?? timestamp}`;
         setLastReading(timestamp);
         setHistory((current) => {
+          if (current.at(-1)?.sampleId === sampleId) return current;
           const recent = current.filter((point) => receivedAt - point.receivedAt <= CHART_WINDOW_MS);
-          return recent.at(-1)?.sampleId === sampleId
-            ? recent
-            : [...recent, { ...data.measurements, receivedAt, sampleId }];
+          return [...recent, { ...data.measurements, receivedAt, sampleId }];
         });
         if (data.alarm_control) {
           if (data.alarm_control.ranges) setRanges(data.alarm_control.ranges);
@@ -164,7 +163,8 @@ export default function Dashboard() {
     : lastReadingAge < 60
       ? `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${lastReadingAge} s`
       : `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${Math.floor(lastReadingAge / 60)} min`;
-  const visibleHistory = history.filter((point) => now - point.receivedAt <= CHART_WINDOW_MS);
+  const chartNow = history.at(-1)?.receivedAt ?? now;
+  const visibleHistory = history.filter((point) => chartNow - point.receivedAt <= CHART_WINDOW_MS);
   const sensors = [
     { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", data: visibleHistory.map((point) => ({ value: point.temperature_c, receivedAt: point.receivedAt })), limits: ranges?.temperature_c },
     { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", data: visibleHistory.map((point) => ({ value: point.humidity_pct, receivedAt: point.receivedAt })), limits: ranges?.humidity_pct },
@@ -232,7 +232,7 @@ export default function Dashboard() {
         {sensors.map((sensor) => <article className="sensor-card" key={sensor.label}>
           <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
-          <Sparkline data={sensor.data} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} now={now} />
+          <Sparkline data={sensor.data} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} now={chartNow} />
         </article>)}
       </section>
       <section className="station-control" aria-label="Pi-5-Kontrollstation">
