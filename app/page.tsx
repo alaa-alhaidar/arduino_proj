@@ -14,6 +14,7 @@ type Range = { min: number; max: number };
 type Ranges = Record<keyof Measurements, Range>;
 type ChartPoint = { value: number; receivedAt: number };
 const CHART_WINDOW_MS = 60_000;
+const SENSOR_POLL_MS = 1_000;
 
 function Sparkline({ data, tone, label, unit, limits, now }: { data: ChartPoint[]; tone: string; label: string; unit: string; limits?: Range; now: number }) {
   const width = 240;
@@ -120,7 +121,7 @@ export default function Dashboard() {
       }
     }
     loadSensors();
-    const timer = window.setInterval(loadSensors, 5000);
+    const timer = window.setInterval(loadSensors, SENSOR_POLL_MS);
     return () => window.clearInterval(timer);
   }, []);
 
