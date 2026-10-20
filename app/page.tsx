@@ -165,11 +165,14 @@ export default function Dashboard() {
       : `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${Math.floor(lastReadingAge / 60)} min`;
   const chartNow = history.at(-1)?.receivedAt ?? now;
   const visibleHistory = history.filter((point) => chartNow - point.receivedAt <= CHART_WINDOW_MS);
+  const outsideRange = (value: number | undefined, limits: Range | undefined) =>
+    value !== undefined && limits !== undefined
+    && (value < limits.min || value > limits.max);
   const sensors = [
-    { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", data: visibleHistory.map((point) => ({ value: point.temperature_c, receivedAt: point.receivedAt })), limits: ranges?.temperature_c },
-    { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", data: visibleHistory.map((point) => ({ value: point.humidity_pct, receivedAt: point.receivedAt })), limits: ranges?.humidity_pct },
-    { tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", data: visibleHistory.map((point) => ({ value: point.pressure_hpa, receivedAt: point.receivedAt })), limits: ranges?.pressure_hpa },
-    { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", data: visibleHistory.map((point) => ({ value: point.gas_resistance_ohm / 1000, receivedAt: point.receivedAt })), limits: ranges?.gas_resistance_ohm ? { min: ranges.gas_resistance_ohm.min / 1000, max: ranges.gas_resistance_ohm.max / 1000 } : undefined },
+    { tone: "orange", label: "Temperatur", value: measurements ? formatNumber(measurements.temperature_c) : "—", unit: "°C", data: visibleHistory.map((point) => ({ value: point.temperature_c, receivedAt: point.receivedAt })), limits: ranges?.temperature_c, alarm: outsideRange(measurements?.temperature_c, ranges?.temperature_c) },
+    { tone: "blue", label: "Luftfeuchtigkeit", value: measurements ? formatNumber(measurements.humidity_pct) : "—", unit: "%", data: visibleHistory.map((point) => ({ value: point.humidity_pct, receivedAt: point.receivedAt })), limits: ranges?.humidity_pct, alarm: outsideRange(measurements?.humidity_pct, ranges?.humidity_pct) },
+    { tone: "violet", label: "Luftdruck", value: measurements ? formatNumber(measurements.pressure_hpa) : "—", unit: "hPa", data: visibleHistory.map((point) => ({ value: point.pressure_hpa, receivedAt: point.receivedAt })), limits: ranges?.pressure_hpa, alarm: outsideRange(measurements?.pressure_hpa, ranges?.pressure_hpa) },
+    { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", data: visibleHistory.map((point) => ({ value: point.gas_resistance_ohm / 1000, receivedAt: point.receivedAt })), limits: ranges?.gas_resistance_ohm ? { min: ranges.gas_resistance_ohm.min / 1000, max: ranges.gas_resistance_ohm.max / 1000 } : undefined, alarm: outsideRange(measurements?.gas_resistance_ohm, ranges?.gas_resistance_ohm) },
   ];
 
   async function controlPi(enabled: boolean) {
@@ -229,7 +232,7 @@ export default function Dashboard() {
         </div>
       </header>
       <section className="sensor-grid" aria-label="Sensorwerte">
-        {sensors.map((sensor) => <article className="sensor-card" key={sensor.label}>
+        {sensors.map((sensor) => <article className={`sensor-card ${sensor.alarm ? "alarm" : ""}`} key={sensor.label}>
           <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
           <Sparkline data={sensor.data} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} />
@@ -282,7 +285,7 @@ export default function Dashboard() {
       <style jsx>{`
         .live.offline { color: #7d8794; background: #edf0f3; }
         .live.offline i { background: #9aa3ad; box-shadow: none; }
-        .sensor-card.alarm { background: #fff0f0; border-color: #e34848; box-shadow: 0 4px 18px rgba(190, 34, 34, .14); }
+        .sensor-card.alarm { background: #ffd9d9; border: 2px solid #dc2626; box-shadow: 0 4px 20px rgba(190, 34, 34, .24); }
         .sensor-card.alarm .sensor-icon { color: #fff; background: #d93636; }
         .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
         .sensor-card.alarm .meter { background: #f2caca; }
