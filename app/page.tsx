@@ -261,14 +261,14 @@ export default function Dashboard() {
             const camera = /cam|kamera/i.test(`${device.name} ${device.hostname}`);
             const deviceType = camera ? "Kamera" : "Temp Sensor";
             return (
-            <a className="device-button" href={camera ? `http://${device.ip}` : "#nano-sensors"} target={camera ? "_blank" : undefined} rel={camera ? "noreferrer" : undefined} key={device.ip}>
+            <div className="device-button" key={device.ip}>
               <span className={`device-status ${device.online ? "online" : "offline"}`} aria-label={device.online ? "Online" : "Offline"} />
               <span className="device-copy">
                 <strong>Node {index + 1}</strong>
                 <span>{deviceType}</span>
                 <small>{device.ip}</small>
               </span>
-            </a>
+            </div>
           )})}
           {!devices.length && <span className="device-empty">{devicesError ? "Pi 5 nicht erreichbar" : "Geräte werden geladen …"}</span>}
         </div>
