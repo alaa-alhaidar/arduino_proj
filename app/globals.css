@@ -29,3 +29,13 @@
 .device-icon.camera::after{width:5px;height:4px;margin-left:-4px}
 @media(max-width:650px){.device-nav{align-items:flex-start;flex-direction:column}.device-buttons{width:100%;justify-content:flex-start}.device-button{min-height:36px;padding:5px 8px}}
 
+.device-nav-heading>small{display:inline;color:#8793a1}
+.device-button{min-width:132px;align-items:flex-start;padding:7px 9px}
+.device-status{width:8px;height:8px;flex:0 0 8px;margin-top:3px;border-radius:50%;background:#9aa3ad}
+.device-status.online{background:#24ad74;box-shadow:0 0 0 3px rgba(36,173,116,.13)}
+.device-status.offline{background:#a2aab3;box-shadow:none}
+.device-copy{display:flex!important;flex-direction:column;gap:1px!important}
+.device-copy>span{color:#637286;font-size:10px;line-height:1.25}
+.device-copy small{display:block;color:#8a96a3;font:9px/1.25 monospace}
+.device-empty{color:#7d8997;font-size:10px;padding:8px 0}
+

@@ -14,16 +14,9 @@ Danach ist die Oberfläche unter `http://localhost:3000` erreichbar.
 
 ## IoT-Geräte-Buttons
 
-Das Dashboard zeigt den Nano und zwei ESP32-CAMs als Geräte-Buttons. Die vom
-Pi 5 ermittelten Kamera-Adressen sind als Standardwerte hinterlegt und können
-in `.env.local` überschrieben werden:
-
-```text
-NEXT_PUBLIC_ESP_CAM_1_URL=http://192.168.178.135
-NEXT_PUBLIC_ESP_CAM_2_URL=http://192.168.178.133
-```
-
-Nach einer Änderung der Variablen muss Next.js neu gestartet werden.
+Das Dashboard lädt die auf dem Pi 5 registrierten Geräte dynamisch über die
+geschützte Kontroll-API. Für jedes Gerät zeigt es Node-Nummer, Gerätetyp,
+IP-Adresse und den aktuellen Online-Status des Pi-Scanners an.
 
 Die Next.js-API veröffentlicht Schaltbefehle im MQTT-Thema:
 

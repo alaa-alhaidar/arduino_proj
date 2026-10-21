@@ -13,12 +13,9 @@ type HistoryPoint = Measurements & { receivedAt: number; sampleId: string };
 type Range = { min: number; max: number };
 type Ranges = Record<keyof Measurements, Range>;
 type ChartPoint = { value: number; receivedAt: number };
+type IoTDevice = { ip: string; name: string; hostname: string; online: boolean; lastChecked: string };
 const CHART_WINDOW_MS = 60_000;
 const SENSOR_POLL_MS = 1_000;
-const cameraDevices = [
-  { name: "CAM 1", url: process.env.NEXT_PUBLIC_ESP_CAM_1_URL ?? "http://192.168.178.135" },
-  { name: "CAM 2", url: process.env.NEXT_PUBLIC_ESP_CAM_2_URL ?? "http://192.168.178.133" },
-];
 
 function Sparkline({ data, tone, label, unit, limits }: { data: ChartPoint[]; tone: string; label: string; unit: string; limits?: Range }) {
   const width = 240;
@@ -91,6 +88,8 @@ export default function Dashboard() {
   const [stationRunning, setStationRunning] = useState<boolean | null>(null);
   const [stationPending, setStationPending] = useState(false);
   const [stationError, setStationError] = useState<string | null>(null);
+  const [devices, setDevices] = useState<IoTDevice[]>([]);
+  const [devicesError, setDevicesError] = useState(false);
 
   useEffect(() => {
     navigator.serviceWorker?.register("/sw.js").catch(() => undefined);
@@ -128,6 +127,23 @@ export default function Dashboard() {
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    async function loadDevices() {
+      try {
+        const response = await fetch(`/api/devices?t=${Date.now()}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.devices)) throw new Error("No devices");
+        setDevices(data.devices);
+        setDevicesError(false);
+      } catch {
+        setDevicesError(true);
+      }
+    }
+    loadDevices();
+    const timer = window.setInterval(loadDevices, 5000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -238,24 +254,23 @@ export default function Dashboard() {
       <nav className="device-nav" aria-label="Vernetzte IoT-Geräte">
         <div className="device-nav-heading">
           <span>VERNETZTE IOT-GERÄTE</span>
-          <small>3 Geräte</small>
+          <small>{devices.length} Geräte</small>
         </div>
         <div className="device-buttons">
-          <a className="device-button active" href="#nano-sensors" aria-current="page">
-            <span className="device-icon temperature" aria-hidden="true">°</span>
-            <span><strong>Nano</strong><small>Temperatur</small></span>
-          </a>
-          {cameraDevices.map((camera) => camera.url ? (
-            <a className="device-button" href={camera.url} target="_blank" rel="noreferrer" key={camera.name}>
-              <span className="device-icon camera" aria-hidden="true">●</span>
-              <span><strong>{camera.name}</strong><small>Öffnen</small></span>
+          {devices.map((device, index) => {
+            const camera = /cam|kamera/i.test(`${device.name} ${device.hostname}`);
+            const deviceType = camera ? "Kamera" : "Temp Sensor";
+            return (
+            <a className="device-button" href={camera ? `http://${device.ip}` : "#nano-sensors"} target={camera ? "_blank" : undefined} rel={camera ? "noreferrer" : undefined} key={device.ip}>
+              <span className={`device-status ${device.online ? "online" : "offline"}`} aria-label={device.online ? "Online" : "Offline"} />
+              <span className="device-copy">
+                <strong>Node {index + 1}</strong>
+                <span>{deviceType}</span>
+                <small>{device.ip}</small>
+              </span>
             </a>
-          ) : (
-            <span className="device-button unavailable" title="Kamera-URL noch nicht konfiguriert" key={camera.name}>
-              <span className="device-icon camera" aria-hidden="true">●</span>
-              <span><strong>{camera.name}</strong><small>IP noch eintragen</small></span>
-            </span>
-          ))}
+          )})}
+          {!devices.length && <span className="device-empty">{devicesError ? "Pi 5 nicht erreichbar" : "Geräte werden geladen …"}</span>}
         </div>
       </nav>
       <section className="sensor-grid" id="nano-sensors" aria-label="Sensorwerte des Nano">
