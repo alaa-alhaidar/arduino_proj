@@ -16,8 +16,8 @@ type ChartPoint = { value: number; receivedAt: number };
 const CHART_WINDOW_MS = 60_000;
 const SENSOR_POLL_MS = 1_000;
 const cameraDevices = [
-  { name: "ESP32-CAM 1", url: process.env.NEXT_PUBLIC_ESP_CAM_1_URL },
-  { name: "ESP32-CAM 2", url: process.env.NEXT_PUBLIC_ESP_CAM_2_URL },
+  { name: "CAM 1", url: process.env.NEXT_PUBLIC_ESP_CAM_1_URL ?? "http://192.168.178.135" },
+  { name: "CAM 2", url: process.env.NEXT_PUBLIC_ESP_CAM_2_URL ?? "http://192.168.178.133" },
 ];
 
 function Sparkline({ data, tone, label, unit, limits }: { data: ChartPoint[]; tone: string; label: string; unit: string; limits?: Range }) {
@@ -243,12 +243,12 @@ export default function Dashboard() {
         <div className="device-buttons">
           <a className="device-button active" href="#nano-sensors" aria-current="page">
             <span className="device-icon temperature" aria-hidden="true">°</span>
-            <span><strong>Nano</strong><small>Temperatur &amp; Sensoren</small></span>
+            <span><strong>Nano</strong><small>Temperatur</small></span>
           </a>
           {cameraDevices.map((camera) => camera.url ? (
             <a className="device-button" href={camera.url} target="_blank" rel="noreferrer" key={camera.name}>
               <span className="device-icon camera" aria-hidden="true">●</span>
-              <span><strong>{camera.name}</strong><small>Kamera öffnen</small></span>
+              <span><strong>{camera.name}</strong><small>Öffnen</small></span>
             </a>
           ) : (
             <span className="device-button unavailable" title="Kamera-URL noch nicht konfiguriert" key={camera.name}>

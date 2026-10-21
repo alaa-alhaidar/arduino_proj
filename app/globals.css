@@ -16,3 +16,16 @@
 .sparkline .tolerance-text{fill:#856800;font-size:7px;font-weight:700}
 .sparkline .tolerance-value{fill:#856800;font-size:7px;font-weight:700}
 
+/* Kompakte Gerätewahl oberhalb der Messwerte. */
+.device-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.device-nav-heading{margin:0;gap:8px}
+.device-nav-heading>small{display:none}
+.device-buttons{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
+.device-button{min-height:38px;width:auto;padding:6px 10px;gap:7px;border-radius:8px;box-shadow:none}
+.device-button strong{font-size:11px}
+.device-button small{display:none}
+.device-icon{width:25px;height:25px;flex-basis:25px;border-radius:6px;font-size:13px}
+.device-icon.camera{font-size:9px}
+.device-icon.camera::after{width:5px;height:4px;margin-left:-4px}
+@media(max-width:650px){.device-nav{align-items:flex-start;flex-direction:column}.device-buttons{width:100%;justify-content:flex-start}.device-button{min-height:36px;padding:5px 8px}}
+
