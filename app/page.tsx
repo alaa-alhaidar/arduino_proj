@@ -15,6 +15,10 @@ type Ranges = Record<keyof Measurements, Range>;
 type ChartPoint = { value: number; receivedAt: number };
 const CHART_WINDOW_MS = 60_000;
 const SENSOR_POLL_MS = 1_000;
+const cameraDevices = [
+  { name: "ESP32-CAM 1", url: process.env.NEXT_PUBLIC_ESP_CAM_1_URL },
+  { name: "ESP32-CAM 2", url: process.env.NEXT_PUBLIC_ESP_CAM_2_URL },
+];
 
 function Sparkline({ data, tone, label, unit, limits }: { data: ChartPoint[]; tone: string; label: string; unit: string; limits?: Range }) {
   const width = 240;
@@ -231,7 +235,30 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
-      <section className="sensor-grid" aria-label="Sensorwerte">
+      <nav className="device-nav" aria-label="Vernetzte IoT-Geräte">
+        <div className="device-nav-heading">
+          <span>VERNETZTE IOT-GERÄTE</span>
+          <small>3 Geräte</small>
+        </div>
+        <div className="device-buttons">
+          <a className="device-button active" href="#nano-sensors" aria-current="page">
+            <span className="device-icon temperature" aria-hidden="true">°</span>
+            <span><strong>Nano</strong><small>Temperatur &amp; Sensoren</small></span>
+          </a>
+          {cameraDevices.map((camera) => camera.url ? (
+            <a className="device-button" href={camera.url} target="_blank" rel="noreferrer" key={camera.name}>
+              <span className="device-icon camera" aria-hidden="true">●</span>
+              <span><strong>{camera.name}</strong><small>Kamera öffnen</small></span>
+            </a>
+          ) : (
+            <span className="device-button unavailable" title="Kamera-URL noch nicht konfiguriert" key={camera.name}>
+              <span className="device-icon camera" aria-hidden="true">●</span>
+              <span><strong>{camera.name}</strong><small>IP noch eintragen</small></span>
+            </span>
+          ))}
+        </div>
+      </nav>
+      <section className="sensor-grid" id="nano-sensors" aria-label="Sensorwerte des Nano">
         {sensors.map((sensor) => <article className={`sensor-card ${sensor.alarm ? "alarm" : ""}`} key={sensor.label}>
           <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
           <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>

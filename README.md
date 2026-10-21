@@ -12,6 +12,19 @@ npm run dev
 
 Danach ist die Oberfläche unter `http://localhost:3000` erreichbar.
 
+## IoT-Geräte-Buttons
+
+Das Dashboard zeigt den Nano und zwei ESP32-CAMs als Geräte-Buttons. Die
+Adressen der Kameras werden in `.env.local` konfiguriert:
+
+```text
+NEXT_PUBLIC_ESP_CAM_1_URL=http://192.168.178.201
+NEXT_PUBLIC_ESP_CAM_2_URL=http://192.168.178.202
+```
+
+Ohne konfigurierte URL bleibt der jeweilige Kamera-Button sichtbar, ist aber
+deaktiviert. Nach einer Änderung der Variablen muss Next.js neu gestartet werden.
+
 Die Next.js-API veröffentlicht Schaltbefehle im MQTT-Thema:
 
 ```text
