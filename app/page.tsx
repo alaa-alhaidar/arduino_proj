@@ -117,6 +117,12 @@ export default function Dashboard() {
         setConnection("ok");
       } catch {
         setMeasurements(null);
+        setHistory([]);
+        setRanges(null);
+        setLastReading(null);
+        setAlarmOn(false);
+        setAutomaticAlarm(false);
+        setAlarmAcknowledged(false);
         setConnection("error");
       }
     }
@@ -158,7 +164,14 @@ export default function Dashboard() {
         const running = data.running === true;
         setStationRunning(running);
         if (!running) {
+          setMeasurements(null);
+          setHistory([]);
+          setRanges(null);
+          setLastReading(null);
           setAlarmOn(false);
+          setAutomaticAlarm(false);
+          setAlarmAcknowledged(false);
+          setConnection("error");
           setControlError(null);
         }
         setStationError(null);
@@ -230,7 +243,14 @@ export default function Dashboard() {
       const running = data.running === true;
       setStationRunning(running);
       if (!running) {
+        setMeasurements(null);
+        setHistory([]);
+        setRanges(null);
+        setLastReading(null);
         setAlarmOn(false);
+        setAutomaticAlarm(false);
+        setAlarmAcknowledged(false);
+        setConnection("error");
         setControlError(null);
       }
     } catch (error) {

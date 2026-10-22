@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requestPi } from "../../lib/pi-mqtt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,23 +23,12 @@ function isDevice(value: unknown): value is PiDevice {
 }
 
 export async function GET() {
-  const baseUrl = process.env.PI_CONTROL_URL;
-  const token = process.env.PI_CONTROL_TOKEN;
-  if (!baseUrl || !token) {
-    return NextResponse.json({ error: "Pi-Kontrollstation ist nicht konfiguriert" }, { status: 503 });
-  }
-
   try {
-    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/devices`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-      signal: AbortSignal.timeout(10000),
-    });
-    const result: unknown = await response.json();
+    const result: unknown = await requestPi("devices");
     const devices = typeof result === "object" && result !== null
       ? (result as { devices?: unknown }).devices
       : undefined;
-    if (!response.ok || !Array.isArray(devices) || !devices.every(isDevice)) {
+    if (!Array.isArray(devices) || !devices.every(isDevice)) {
       throw new Error("Ungültige Geräteliste");
     }
     return NextResponse.json({

@@ -1,5 +1,6 @@
 import { connectAsync } from "mqtt";
 import { NextResponse } from "next/server";
+import { requestPi } from "../../lib/pi-mqtt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,29 +59,20 @@ function telemetryForDashboard(telemetry: Telemetry) {
 }
 
 export async function GET() {
-  const controlUrl = process.env.PI_CONTROL_URL;
-  const controlToken = process.env.PI_CONTROL_TOKEN;
-  if (controlUrl && controlToken) {
-    try {
-      const response = await fetch(`${controlUrl.replace(/\/$/, "")}/telemetry`, {
-        headers: { Authorization: `Bearer ${controlToken}` },
-        cache: "no-store",
-        signal: AbortSignal.timeout(10000),
-      });
-      const telemetry: unknown = await response.json();
-      if (!response.ok || !isTelemetry(telemetry)) {
-        throw new Error("Ungültige Sensordaten");
-      }
-      return NextResponse.json(telemetryForDashboard(telemetry), { headers: { "Cache-Control": "no-store" } });
-    } catch {
-      return NextResponse.json({ error: "Keine HTTPS-Sensordaten verfügbar" }, { status: 503 });
+  try {
+    const status = await requestPi<{ running?: unknown }>("status");
+    if (status.running !== true) {
+      return NextResponse.json({ error: "Pi-Kontrollstation ist gestoppt" }, { status: 503 });
     }
+  } catch {
+    return NextResponse.json({ error: "Pi-Kontrollstation über MQTT nicht erreichbar" }, { status: 503 });
   }
 
   const brokerUrl = process.env.MQTT_URL ?? "mqtt://127.0.0.1:18830";
   const topic = process.env.MQTT_TELEMETRY_TOPIC ?? "iot/v1/nodes/pi-05/telemetry";
 
   let client: Awaited<ReturnType<typeof connectAsync>> | undefined;
+  const alarmState = requestPi<Record<string, unknown>>("alarm_state").catch(() => undefined);
 
   try {
     const connectedClient = await connectAsync(brokerUrl, {
@@ -114,7 +106,11 @@ export async function GET() {
       });
     });
 
-    return NextResponse.json(telemetry, { headers: { "Cache-Control": "no-store" } });
+    const control = await alarmState;
+    return NextResponse.json(
+      control ? telemetryForDashboard({ ...telemetry, alarm_control: control } as Telemetry) : telemetry,
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch {
     return NextResponse.json({ error: "Keine MQTT-Sensordaten verfügbar" }, { status: 503 });
   } finally {

@@ -15,7 +15,7 @@ Danach ist die Oberfläche unter `http://localhost:3000` erreichbar.
 ## IoT-Geräte-Buttons
 
 Das Dashboard lädt die auf dem Pi 5 registrierten Geräte dynamisch über die
-geschützte Kontroll-API. Für jedes Gerät zeigt es Node-Nummer, Gerätetyp,
+geschützte MQTT-Steuerung. Für jedes Gerät zeigt es Node-Nummer, Gerätetyp,
 IP-Adresse und den aktuellen Online-Status des Pi-Scanners an.
 
 Die Next.js-API veröffentlicht Schaltbefehle im MQTT-Thema:
@@ -30,7 +30,7 @@ Die PWA liest die Nano-Sensordaten verschlüsselt über MQTT/TLS auf Port 8883 a
 htw/alaa/iot2026/nano-01/telemetry
 ```
 
-Der Pi 5 verwendet für Telemetrie, Alarmsteuerung und Kontroll-API
+Der Pi 5 verwendet für Telemetrie, Alarmsteuerung und Kontrollbefehle
 `broker.emqx.io:8883` mit dem System-CA-Speicher. Die eigenständige
 Nano-Firmware liegt außerhalb dieses PWA-Projekts im Ordner `arduino-code`.
 

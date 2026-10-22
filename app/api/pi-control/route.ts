@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requestPi } from "../../lib/pi-mqtt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -6,31 +7,14 @@ export const dynamic = "force-dynamic";
 type Action = "start" | "stop" | "status";
 
 async function callPi(action: Action) {
-  const baseUrl = process.env.PI_CONTROL_URL;
-  const token = process.env.PI_CONTROL_TOKEN;
-  if (!baseUrl || !token) {
-    return NextResponse.json(
-      { error: "Pi-Kontrollstation ist nicht konfiguriert" },
-      { status: 503 },
-    );
-  }
-
   try {
-    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/${action}`, {
-      method: action === "status" ? "GET" : "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-      // Stopping the Docker stack can legitimately take longer than 10 seconds.
-      signal: AbortSignal.timeout(60000),
-    });
-    const data = await response.json();
+    const data = await requestPi<Record<string, unknown>>(action);
     return NextResponse.json(data, {
-      status: response.status,
       headers: { "Cache-Control": "no-store, max-age=0" },
     });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
-      { error: "Pi-Kontrollstation über HTTPS nicht erreichbar" },
+      { error: error instanceof Error ? error.message : "Pi-Kontrollstation über MQTT nicht erreichbar" },
       { status: 503 },
     );
   }

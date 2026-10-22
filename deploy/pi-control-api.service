@@ -1,10 +1,10 @@
 [Unit]
-Description=Sensor Campus HTTPS control backend
+Description=Sensor Campus MQTT control worker
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/alaa/pi-alarm/venv/bin/python /home/alaa/pi-control/pi_control_api.py
+ExecStart=/home/alaa/pi-alarm/venv/bin/python /home/alaa/pi-control/pi_control_mqtt.py
 EnvironmentFile=/home/alaa/.config/sensor-campus/control.env
 Restart=always
 RestartSec=3
