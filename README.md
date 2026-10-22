@@ -30,10 +30,9 @@ Die PWA liest die Nano-Sensordaten verschlüsselt über MQTT/TLS auf Port 8883 a
 htw/alaa/iot2026/nano-01/telemetry
 ```
 
-Die Nano-Firmware nutzt `WiFiClientSecure`, prüft den Broker mit dem DigiCert
-Global Root G2 und wartet vor dem TLS-Verbindungsaufbau auf die NTP-Uhrzeit.
-Der Pi 5 verwendet für Telemetrie, Alarmsteuerung und Kontroll-API ebenfalls
-`broker.emqx.io:8883` mit dem System-CA-Speicher.
+Der Pi 5 verwendet für Telemetrie, Alarmsteuerung und Kontroll-API
+`broker.emqx.io:8883` mit dem System-CA-Speicher. Die eigenständige
+Nano-Firmware liegt außerhalb dieses PWA-Projekts im Ordner `arduino-code`.
 
 Der Pi 5 muss dort retained JSON-Nachrichten in diesem Format veröffentlichen:
 
