@@ -21,14 +21,19 @@ IP-Adresse und den aktuellen Online-Status des Pi-Scanners an.
 Die Next.js-API veröffentlicht Schaltbefehle im MQTT-Thema:
 
 ```text
-iot/v1/nodes/pi-05/commands/alarm
+htw/alaa/iot2026/nano-01/commands/alarm
 ```
 
-Die PWA liest die Nano-Sensordaten aus:
+Die PWA liest die Nano-Sensordaten verschlüsselt über MQTT/TLS auf Port 8883 aus:
 
 ```text
-iot/v1/nodes/pi-05/telemetry
+htw/alaa/iot2026/nano-01/telemetry
 ```
+
+Die Nano-Firmware nutzt `WiFiClientSecure`, prüft den Broker mit dem DigiCert
+Global Root G2 und wartet vor dem TLS-Verbindungsaufbau auf die NTP-Uhrzeit.
+Der Pi 5 verwendet für Telemetrie, Alarmsteuerung und Kontroll-API ebenfalls
+`broker.emqx.io:8883` mit dem System-CA-Speicher.
 
 Der Pi 5 muss dort retained JSON-Nachrichten in diesem Format veröffentlichen:
 
@@ -47,4 +52,6 @@ Der Pi 5 muss dort retained JSON-Nachrichten in diesem Format veröffentlichen:
 
 ## Pi-5-Dienste
 
-Die Python-Dienste für GPIO, MQTT und die Kontroll-API laufen separat auf dem Pi 5. Dieses Repository enthält nur das Next.js-PWA-Dashboard. Wenn Next.js lokal auf dem Mac läuft, verbindet es sich über `MQTT_URL` direkt mit dem MQTT-Broker des Pi 5.
+Die Python-Dienste für GPIO, MQTT und die Kontroll-API laufen separat auf dem
+Pi 5. Wenn Next.js lokal auf dem Mac läuft, verbindet es sich über `MQTT_URL`
+verschlüsselt mit dem öffentlichen MQTT-Broker.

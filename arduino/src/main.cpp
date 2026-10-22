@@ -2,20 +2,22 @@
 #include <Adafruit_BME680.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <Wire.h>
 #include <time.h>
 
 #include <cmath>
 
+#include "emqx_ca.h"
 #include "secrets.h"
 
-constexpr char MQTT_HOST[] = "192.168.178.128";
-constexpr uint16_t MQTT_PORT = 1883;
-constexpr char MQTT_TOPIC[] = "iot/v1/nodes/pi-05/telemetry";
+constexpr char MQTT_HOST[] = "broker.emqx.io";
+constexpr uint16_t MQTT_PORT = 8883;
+constexpr char MQTT_TOPIC[] = "htw/alaa/iot2026/nano-01/telemetry";
 constexpr uint32_t SEND_INTERVAL_MS = 5000;
 constexpr uint32_t RETRY_INTERVAL_MS = 3000;
 
-WiFiClient networkClient;
+WiFiClientSecure networkClient;
 PubSubClient mqttClient(networkClient);
 Adafruit_BME680 bme;
 
@@ -81,6 +83,10 @@ void connectMqtt() {
   if (WiFi.status() != WL_CONNECTED || mqttClient.connected() ||
       millis() - lastMqttAttemptAt < RETRY_INTERVAL_MS) return;
   lastMqttAttemptAt = millis();
+  if (time(nullptr) < 1700000000) {
+    Serial.println("Warte auf Uhrzeitsynchronisierung für TLS ...");
+    return;
+  }
   const String clientId = "nano-esp32-" + String(bootId).substring(0, 8);
   if (mqttClient.connect(clientId.c_str())) {
     Serial.println("MQTT verbunden.");
@@ -138,6 +144,7 @@ void setup() {
   connectSensor();
   createBootId();
   WiFi.mode(WIFI_STA);
+  networkClient.setCACert(EMQX_ROOT_CA);
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
   mqttClient.setBufferSize(768);
   configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
