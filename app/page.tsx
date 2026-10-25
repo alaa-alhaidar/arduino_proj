@@ -293,7 +293,7 @@ export default function Dashboard() {
             <strong>{liveTimeText}</strong>
           </time>
           <div className="connection-info">
-            <div className={`live ${connection !== "ok" ? "offline" : ""}`}><i /> {connection === "ok" ? "Nano über Pi 5" : connection === "error" ? "Keine Sensordaten" : "Verbindung …"}</div>
+            <div className={`live ${connection !== "ok" ? "offline" : ""}`}><i /> {connection === "ok" ? "Sensordaten live" : connection === "error" ? "Keine Sensordaten" : "Verbindung …"}</div>
             <time dateTime={lastReading ?? undefined} title={lastReadingDate ? lastReadingDate.toLocaleString("de-DE") : undefined}>{lastReadingText}</time>
           </div>
         </div>
