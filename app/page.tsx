@@ -349,6 +349,7 @@ export default function Dashboard() {
           </article>)}
         </section>
       </div>
+      <div className="control-deck">
       <section className="station-control" aria-label="Pi-5-Kontrollstation">
         <div>
           <span>KONTROLLSTATION PI 5</span>
@@ -391,6 +392,7 @@ export default function Dashboard() {
           </button>
         </div>
       </section>
+      </div>
       <style jsx>{`
         .live.offline { color: #7d8794; background: #edf0f3; }
         .live.offline i { background: #9aa3ad; box-shadow: none; }
@@ -399,24 +401,26 @@ export default function Dashboard() {
         .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
         .sensor-card.alarm .meter { background: #f2caca; }
         .sensor-card.alarm .meter span { background: #d93636; }
-        .industrial-control { max-width: 1124px; margin: 0 auto 42px; padding: 12px 14px; background: #d8dde2; border: 2px solid #aeb6bf; border-radius: 4px; box-shadow: inset 0 1px #fff, 0 3px 8px rgba(19,35,52,.12); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-        .control-status { min-width: 170px; padding: 9px 12px; background: #202a30; border: 2px inset #7d878d; color: #dce7e9; }
+        .control-deck { width: min(760px, calc(100% - 32px)); margin: 0 auto 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .control-deck :global(.station-control) { width: auto; max-width: none; min-height: 92px; margin: 0; padding: 14px; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); }
+        .industrial-control { min-width: 0; margin: 0; padding: 14px; background: #fff; border: 1px solid #cbd5df; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .control-status { min-width: 0; padding: 0; background: transparent; border: 0; color: #253342; }
         .control-status span { display: block; color: #96a5aa; font: 700 10px monospace; letter-spacing: 1.2px; margin-bottom: 7px; }
-        .control-status strong { display: flex; align-items: center; gap: 8px; font: 700 14px monospace; letter-spacing: .7px; }
-        .control-status i { width: 10px; height: 10px; border-radius: 50%; background: #31c278; box-shadow: 0 0 8px #31c278; }
+        .control-status strong { display: flex; align-items: center; gap: 7px; font: 700 12px monospace; letter-spacing: .5px; }
+        .control-status i { width: 8px; height: 8px; border-radius: 50%; background: #31c278; box-shadow: 0 0 7px #31c278; }
         .control-status small { display: block; max-width: 270px; margin-top: 8px; color: #ff9b96; font: 10px/1.35 monospace; }
         .industrial-control.active .control-status i { background: #ff3b30; box-shadow: 0 0 9px #ff3b30; }
-        .industrial-control.active .control-status strong { color: #ff7770; }
+        .industrial-control.active .control-status strong { color: #c92f2f; }
         .industrial-control.offline .control-status i { background: #7f8b91; box-shadow: none; }
         .industrial-control.offline .control-status strong { color: #aeb9bd; }
-        .control-buttons { display: grid; grid-template-columns: repeat(2, 84px); gap: 8px; }
+        .control-buttons { display: grid; grid-template-columns: repeat(2, 62px); gap: 6px; }
         .industrial-button { min-height: 38px; padding: 0 10px; border-radius: 4px; border: 1px solid; color: #fff; display: flex; align-items: center; justify-content: center; font: 800 9px/1 Arial,sans-serif; letter-spacing: .6px; box-shadow: inset 0 1px rgba(255,255,255,.22), inset 0 -2px rgba(0,0,0,.18), 0 2px 0 #697178; }
         .industrial-button:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 2px rgba(0,0,0,.18), 0 1px 0 #697178; }
         .industrial-button:disabled { opacity: .42; cursor: not-allowed; }
         .industrial-button.stop { background: #287b49; border-color: #175832; }
         .industrial-button.alarm-trigger { background: #c92f2f; border-color: #8e1d1d; }
         .button-symbol { width: 27px; height: 27px; border: 2px solid rgba(255,255,255,.75); display: grid; place-items: center; font-size: 15px; border-radius: 2px; }
-        @media (max-width: 650px) { .industrial-control { margin: 0 12px 20px; padding: 8px 9px; align-items: center; flex-direction: row; gap: 8px; }.control-status { min-width: 108px; padding: 7px 8px; }.control-status span { margin-bottom: 4px; font-size: 8px; }.control-status strong { font-size: 10px; }.control-buttons { margin-left: auto; grid-template-columns: repeat(2, 66px); gap: 6px; }.industrial-button { min-height: 34px; padding: 0 6px; }.button-symbol { display: none; } }
+        @media (max-width: 650px) { .control-deck { width: calc(100% - 24px); grid-template-columns: 1fr; gap: 8px; margin-bottom: 20px; }.control-deck :global(.station-control), .industrial-control { min-height: 76px; padding: 10px 12px; align-items: center; flex-direction: row; gap: 8px; }.control-status { min-width: 108px; padding: 0; }.control-status span { margin-bottom: 4px; font-size: 8px; }.control-status strong { font-size: 10px; }.control-buttons { margin-left: auto; grid-template-columns: repeat(2, 58px); gap: 6px; }.industrial-button { min-height: 32px; padding: 0 6px; }.button-symbol { display: none; } }
       `}</style>
     </main>
   );
