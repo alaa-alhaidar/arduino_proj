@@ -210,8 +210,8 @@ export default function Dashboard() {
   const formatNumber = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const lastReadingDate = lastReading ? new Date(lastReading) : null;
   const lastReadingText = !lastReadingDate || Number.isNaN(lastReadingDate.getTime())
-    ? "Noch keine Messung"
-    : `Letzte Messung ${lastReadingDate.toLocaleTimeString("de-DE")}`;
+    ? "--:--:--"
+    : lastReadingDate.toLocaleTimeString("de-DE");
   const liveDate = new Date(now);
   const liveDateText = liveDate.toLocaleDateString("de-DE", {
     weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin",
