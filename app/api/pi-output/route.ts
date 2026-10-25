@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
   try {
     const connectedClient = await connectAsync(brokerUrl, {
-      connectTimeout: 3000,
+      connectTimeout: 10000,
       reconnectPeriod: 0,
       username: process.env.MQTT_USERNAME,
       password: process.env.MQTT_PASSWORD,
