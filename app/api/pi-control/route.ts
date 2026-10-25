@@ -9,7 +9,10 @@ type Action = "start" | "stop" | "status";
 async function callPi(action: Action) {
   try {
     const data = await requestPi<Record<string, unknown>>(action);
-    return NextResponse.json(data, {
+    const alarmControl = action === "status"
+      ? await requestPi<Record<string, unknown>>("alarm_state").catch(() => undefined)
+      : undefined;
+    return NextResponse.json(alarmControl ? { ...data, alarm_control: alarmControl } : data, {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });
   } catch (error) {

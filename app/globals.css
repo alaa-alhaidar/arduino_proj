@@ -41,3 +41,36 @@
 .device-button{cursor:default;transition:none}
 .device-button:hover{border-color:#dce4ec;box-shadow:none;transform:none}
 
+/* Node 2 opens a compact camera surface; the actual relay stream follows later. */
+.camera-button{appearance:none;font-family:inherit;text-align:left;cursor:pointer;border:1px solid #dce4ec}
+.camera-button:hover{border-color:#9eb4cb}
+.camera-button.active{color:#fff;background:var(--navy);border-color:var(--navy)}
+.camera-button.active .device-copy>span{color:#c7d8ea}
+.camera-glyph{margin-left:auto;font-size:17px;line-height:1;color:#526f8f}
+.camera-button.active .camera-glyph{color:#fff}
+.monitoring-workspace{max-width:1180px;margin:0 auto;padding:28px 28px 30px}
+.monitoring-workspace .sensor-grid{max-width:none;margin:0;padding:0}
+.monitoring-workspace.camera-active{display:grid;grid-template-columns:minmax(390px,1.08fr) minmax(480px,1fr);align-items:stretch;gap:16px}
+.monitoring-workspace.camera-active .sensor-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.camera-panel{min-width:0;height:100%;margin:0;border:1px solid #cbd6e2;border-radius:14px;background:#101820;overflow:hidden;box-shadow:0 12px 34px rgba(17,37,58,.18);position:sticky;top:12px;display:flex;flex-direction:column}
+.camera-panel header{height:42px;padding:0 12px 0 15px;display:flex;align-items:center;justify-content:space-between;color:#e7edf3;background:#18232d}
+.camera-panel header span{display:flex;align-items:center;gap:8px;font:700 11px monospace;letter-spacing:.8px}
+.camera-panel header i{width:7px;height:7px;border-radius:50%;background:#8a949e}
+.camera-panel header button{width:28px;height:28px;padding:0;border:0;border-radius:7px;color:#d6dde4;background:#2a3641;font-size:19px;line-height:1}
+.camera-stage{flex:1;aspect-ratio:auto;min-height:210px;display:grid;place-content:center;justify-items:center;gap:6px;color:#aab5bf;background:radial-gradient(circle at center,#1d2a34 0,#0d141a 65%)}
+.camera-stage img{width:100%;height:100%;object-fit:contain}
+.camera-placeholder{font-size:36px;color:#60717f}
+.camera-stage strong{font:700 13px Manrope,sans-serif;color:#d5dde4}
+.camera-stage small{font-size:10px;color:#75838f}
+@media(max-width:950px){.monitoring-workspace.camera-active{grid-template-columns:1fr}.camera-panel{height:auto;position:static}.camera-stage{aspect-ratio:16/7}.monitoring-workspace.camera-active .sensor-grid{grid-template-columns:repeat(4,minmax(210px,1fr));overflow-x:auto;scroll-snap-type:x mandatory}.monitoring-workspace.camera-active .sensor-card{scroll-snap-align:start}}
+@media(max-width:650px){.device-buttons{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px}.device-button{flex:0 0 auto}.monitoring-workspace{padding:18px 12px 20px}.camera-panel{border-radius:11px}.camera-stage{aspect-ratio:16/10;min-height:180px}.monitoring-workspace .sensor-grid,.monitoring-workspace.camera-active .sensor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:visible;padding-bottom:0;scroll-snap-type:none}.monitoring-workspace .sensor-card{min-width:0;min-height:0;padding:10px 8px 8px;scroll-snap-align:none}.monitoring-workspace .sensor-heading{font-size:9px}.monitoring-workspace .reading{font-size:18px}.monitoring-workspace .sparkline.empty{height:54px;font-size:8px}.station-buttons button{min-height:32px}.industrial-button{min-height:34px!important}.industrial-control{padding:8px 9px!important}}
+
+.live-clock{min-width:142px;padding-right:14px;border-right:1px solid #e1e7ee;display:flex;align-items:flex-end;flex-direction:column;font-variant-numeric:tabular-nums}
+.live-clock span{color:#7b8795;font-size:10px;font-weight:600;text-transform:uppercase}
+.live-clock strong{color:var(--navy);font:800 18px/1.2 Manrope,sans-serif;letter-spacing:.4px}
+@media(max-width:540px){.top-actions{gap:8px}.live-clock{min-width:auto;padding-right:8px}.live-clock span{font-size:8px}.live-clock strong{font-size:14px}.connection-info time{display:none}}
+
+/* Opaque sticky header stays crisp and visible while the dashboard scrolls. */
+.topbar{position:sticky;top:0;z-index:100;background:#fff;box-shadow:0 2px 10px rgba(18,59,109,.08);isolation:isolate}
+@media(max-width:540px){.topbar{min-height:64px;padding:8px 12px}.brand{gap:8px}.brandmark{width:32px;height:32px;border-radius:8px}.brandmark span{bottom:6px;transform:scale(.82);transform-origin:bottom}.brand strong{max-width:64px;font-size:13px;line-height:1.05}.live-clock span{font-size:7px}.live-clock strong{font-size:13px}.live{padding:5px 7px;font-size:8px;white-space:nowrap}}
+

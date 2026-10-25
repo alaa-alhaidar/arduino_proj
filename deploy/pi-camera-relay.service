@@ -1,0 +1,15 @@
+[Unit]
+Description=Sensor Campus camera JPEG relay
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/alaa/pi-control/pi_camera_relay.py
+EnvironmentFile=/home/alaa/.config/sensor-campus/camera.env
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

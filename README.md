@@ -54,3 +54,24 @@ Der Pi 5 muss dort retained JSON-Nachrichten in diesem Format veröffentlichen:
 Die Python-Dienste für GPIO, MQTT und die Kontroll-API laufen separat auf dem
 Pi 5. Wenn Next.js lokal auf dem Mac läuft, verbindet es sich über `MQTT_URL`
 verschlüsselt mit dem öffentlichen MQTT-Broker.
+
+## Kamera-Relay
+
+`deploy/pi_camera_relay.py` nimmt JPEG-Frames des ESP32-S3-CAM auf dem Pi 5
+entgegen. Upload und Abruf verwenden getrennte Bearer-Tokens. Die PWA ruft
+`/api/camera` auf; dadurch bleibt das Viewer-Token ausschließlich auf dem
+Server und wird nicht an den Browser ausgeliefert.
+
+Pi-Konfiguration in `/home/alaa/.config/sensor-campus/camera.env`:
+
+```text
+CAMERA_UPLOAD_TOKEN=<zufälliges langes Token>
+CAMERA_VIEW_TOKEN=<anderes zufälliges langes Token>
+CAMERA_RELAY_HOST=127.0.0.1
+CAMERA_RELAY_PORT=8766
+```
+
+Die öffentliche PWA benötigt `CAMERA_RELAY_URL` und dasselbe
+`CAMERA_VIEW_TOKEN`. Das Relay muss über einen HTTPS-Tunnel oder Reverse Proxy
+erreichbar gemacht werden. Bis die neue Kamera eintrifft, kann der Pi-Dienst
+bereits installiert und über `/health` geprüft werden.

@@ -31,6 +31,18 @@
 .station-buttons button { min-height: 34px; padding: 0 13px; border: 0; border-radius: 6px; color: #fff; background: #287b49; font-size: 10px; font-weight: 800; letter-spacing: .45px; }
 .station-buttons button:last-child { background: #a93434; }
 .station-buttons button:disabled { color: #78828c; background: #d5dbe1; opacity: 1; cursor: not-allowed; }
+.camera-button { cursor: pointer; text-align: left; }
+.camera-button.active { border-color: #2389c9; box-shadow: 0 0 0 2px rgba(35,137,201,.14); }
+.camera-glyph { margin-left: auto; color: #2389c9; font-size: 22px; }
+.camera-panel { min-width: 0; max-width: none; margin: 0; overflow: hidden; border: 1px solid #b7c5d2; border-radius: 10px; background: #182128; box-shadow: 0 5px 20px rgba(19,35,52,.16); }
+.camera-panel header { min-height: 42px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; color: #e8f1f5; background: #26343e; font: 700 12px monospace; }
+.camera-panel header span { display: flex; align-items: center; gap: 8px; }
+.camera-panel header i { width: 8px; height: 8px; border-radius: 50%; background: #31c278; box-shadow: 0 0 7px #31c278; }
+.camera-panel header button { border: 0; padding: 3px 8px; color: #dce7e9; background: transparent; font-size: 24px; cursor: pointer; }
+.camera-stage { min-height: 300px; display: grid; place-items: center; align-content: center; gap: 8px; color: #dce7e9; text-align: center; }
+.camera-stage img { display: block; width: 100%; max-height: 70vh; object-fit: contain; }
+.camera-stage small { color: #96a5aa; }
+.camera-placeholder { color: #52636e; font-size: 58px; }
 
 @media (max-width: 650px) {
   .industrial-control { margin: 0 16px 24px; align-items: stretch; flex-direction: column; }
@@ -40,4 +52,6 @@
   .button-symbol { display: none; }
   .station-control { margin: 0 16px 18px; align-items: stretch; flex-direction: column; }
   .station-buttons { display: grid; grid-template-columns: 1fr 1fr; }
+  .camera-panel { margin: 0; }
+  .camera-stage { min-height: 220px; }
 }

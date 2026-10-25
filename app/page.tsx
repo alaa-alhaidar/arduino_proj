@@ -90,6 +90,10 @@ export default function Dashboard() {
   const [stationError, setStationError] = useState<string | null>(null);
   const [devices, setDevices] = useState<IoTDevice[]>([]);
   const [devicesError, setDevicesError] = useState(false);
+  const [cameraFrameUrl, setCameraFrameUrl] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState(false);
+  const cameraOnline = devices.some((device) =>
+    device.online && /cam|kamera/i.test(`${device.name} ${device.hostname}`));
 
   useEffect(() => {
     navigator.serviceWorker?.register("/sw.js").catch(() => undefined);
@@ -120,9 +124,6 @@ export default function Dashboard() {
         setHistory([]);
         setRanges(null);
         setLastReading(null);
-        setAlarmOn(false);
-        setAutomaticAlarm(false);
-        setAlarmAcknowledged(false);
         setConnection("error");
       }
     }
@@ -163,6 +164,11 @@ export default function Dashboard() {
         if (!response.ok) throw new Error(data.error ?? "Status nicht verfügbar");
         const running = data.running === true;
         setStationRunning(running);
+        if (data.alarm_control) {
+          setAlarmOn(data.alarm_control.alarm_active === true);
+          setAutomaticAlarm(data.alarm_control.automatic_alarm === true);
+          setAlarmAcknowledged(data.alarm_control.automatic_alarm_acknowledged === true);
+        }
         if (!running) {
           setMeasurements(null);
           setHistory([]);
@@ -186,16 +192,33 @@ export default function Dashboard() {
     return () => window.clearInterval(timer);
   }, [stationPending]);
 
+  useEffect(() => {
+    if (!cameraOnline) {
+      setCameraFrameUrl(null);
+      setCameraError(true);
+      return;
+    }
+    const updateFrame = () => {
+      setCameraError(false);
+      setCameraFrameUrl(`/api/camera?t=${Date.now()}`);
+    };
+    updateFrame();
+    const timer = window.setInterval(updateFrame, 200);
+    return () => window.clearInterval(timer);
+  }, [cameraOnline]);
+
   const formatNumber = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const lastReadingDate = lastReading ? new Date(lastReading) : null;
-  const lastReadingAge = lastReadingDate && !Number.isNaN(lastReadingDate.getTime())
-    ? Math.max(0, Math.floor((now - lastReadingDate.getTime()) / 1000))
-    : null;
-  const lastReadingText = lastReadingAge === null
+  const lastReadingText = !lastReadingDate || Number.isNaN(lastReadingDate.getTime())
     ? "Noch keine Messung"
-    : lastReadingAge < 60
-      ? `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${lastReadingAge} s`
-      : `Letzte Messung ${lastReadingDate?.toLocaleTimeString("de-DE")} · vor ${Math.floor(lastReadingAge / 60)} min`;
+    : `Letzte Messung ${lastReadingDate.toLocaleTimeString("de-DE")}`;
+  const liveDate = new Date(now);
+  const liveDateText = liveDate.toLocaleDateString("de-DE", {
+    weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin",
+  });
+  const liveTimeText = liveDate.toLocaleTimeString("de-DE", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Europe/Berlin",
+  });
   const chartNow = history.at(-1)?.receivedAt ?? now;
   const visibleHistory = history.filter((point) => chartNow - point.receivedAt <= CHART_WINDOW_MS);
   const outsideRange = (value: number | undefined, limits: Range | undefined) =>
@@ -265,6 +288,10 @@ export default function Dashboard() {
       <header className="topbar">
         <div className="brand"><div className="brandmark"><span /><span /><span /></div><strong>Sensor Campus</strong></div>
         <div className="top-actions">
+          <time className="live-clock" dateTime={liveDate.toISOString()}>
+            <span>{liveDateText}</span>
+            <strong>{liveTimeText}</strong>
+          </time>
           <div className="connection-info">
             <div className={`live ${connection !== "ok" ? "offline" : ""}`}><i /> {connection === "ok" ? "Nano über Pi 5" : connection === "error" ? "Keine Sensordaten" : "Verbindung …"}</div>
             <time dateTime={lastReading ?? undefined} title={lastReadingDate ? lastReadingDate.toLocaleString("de-DE") : undefined}>{lastReadingText}</time>
@@ -288,18 +315,40 @@ export default function Dashboard() {
                 <span>{deviceType}</span>
                 <small>{device.ip}</small>
               </span>
+              {camera && <span className="camera-glyph" aria-hidden="true">▣</span>}
             </div>
           )})}
           {!devices.length && <span className="device-empty">{devicesError ? "Pi 5 nicht erreichbar" : "Geräte werden geladen …"}</span>}
         </div>
       </nav>
-      <section className="sensor-grid" id="nano-sensors" aria-label="Sensorwerte des Nano">
-        {sensors.map((sensor) => <article className={`sensor-card ${sensor.alarm ? "alarm" : ""}`} key={sensor.label}>
-          <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
-          <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
-          <Sparkline data={sensor.data} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} />
-        </article>)}
-      </section>
+      <div className="monitoring-workspace camera-active">
+        <section className="camera-panel" id="camera-view" aria-label="Node 2 Livebild">
+          <header><span><i /> Node 2 · Live</span></header>
+          <div className="camera-stage">
+            {cameraFrameUrl && !cameraError ? (
+              <img
+                src={cameraFrameUrl}
+                alt="Livebild von Node 2"
+                onLoad={() => setCameraError(false)}
+                onError={() => setCameraError(true)}
+              />
+            ) : (
+              <>
+                <span className="camera-placeholder" aria-hidden="true">▣</span>
+                <strong>Livebild nicht verfügbar</strong>
+                <small>{cameraOnline ? "Verbindung wird aufgebaut …" : "Kamera offline"}</small>
+              </>
+            )}
+          </div>
+        </section>
+        <section className="sensor-grid" id="nano-sensors" aria-label="Sensorwerte des Nano">
+          {sensors.map((sensor) => <article className={`sensor-card ${sensor.alarm ? "alarm" : ""}`} key={sensor.label}>
+            <div className="sensor-heading"><span>{sensor.label}</span><i>{measurements ? "Live" : "Offline"}</i></div>
+            <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
+            <Sparkline data={sensor.data} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} />
+          </article>)}
+        </section>
+      </div>
       <section className="station-control" aria-label="Pi-5-Kontrollstation">
         <div>
           <span>KONTROLLSTATION PI 5</span>
@@ -309,8 +358,8 @@ export default function Dashboard() {
           {stationError && <small>{stationError}</small>}
         </div>
         <div className="station-buttons">
-          <button type="button" disabled={stationPending || stationRunning !== false} onClick={() => controlStation("start")}>PI 5 STARTEN</button>
-          <button type="button" disabled={stationPending || stationRunning !== true} onClick={() => controlStation("stop")}>PI 5 STOPPEN</button>
+          <button type="button" disabled={stationPending || stationRunning !== false} onClick={() => controlStation("start")}>START</button>
+          <button type="button" disabled={stationPending || stationRunning !== true} onClick={() => controlStation("stop")}>STOP</button>
         </div>
       </section>
       <section className={`industrial-control ${stationRunning !== true ? "offline" : alarmOn ? "active" : ""}`} aria-label="Alarmsteuerung">
@@ -335,12 +384,10 @@ export default function Dashboard() {
         </div>
         <div className="control-buttons">
           <button className="industrial-button stop" type="button" disabled={pendingAlarm === "off" || stationRunning !== true} aria-disabled={pendingAlarm !== null || stationRunning !== true} onClick={() => controlPi(false)}>
-            <span className="button-symbol">■</span>
-            <span>ALARM<br/>AUSSCHALTEN</span>
+            <span>AUS</span>
           </button>
           <button className="industrial-button alarm-trigger" type="button" disabled={pendingAlarm === "on" || stationRunning !== true} aria-disabled={pendingAlarm !== null || stationRunning !== true} onClick={() => controlPi(true)}>
-            <span className="button-symbol">!</span>
-            <span>ALARM<br/>AUSLÖSEN</span>
+            <span>ALARM</span>
           </button>
         </div>
       </section>
@@ -362,14 +409,14 @@ export default function Dashboard() {
         .industrial-control.active .control-status strong { color: #ff7770; }
         .industrial-control.offline .control-status i { background: #7f8b91; box-shadow: none; }
         .industrial-control.offline .control-status strong { color: #aeb9bd; }
-        .control-buttons { display: grid; grid-template-columns: repeat(2, 138px); gap: 10px; }
-        .industrial-button { min-height: 58px; border-radius: 3px; border: 2px solid; color: #fff; display: flex; align-items: center; justify-content: center; gap: 9px; font: 800 10px/1.3 Arial,sans-serif; letter-spacing: .6px; text-align: left; box-shadow: inset 0 2px rgba(255,255,255,.22), inset 0 -3px rgba(0,0,0,.2), 0 3px 0 #697178; }
+        .control-buttons { display: grid; grid-template-columns: repeat(2, 84px); gap: 8px; }
+        .industrial-button { min-height: 38px; padding: 0 10px; border-radius: 4px; border: 1px solid; color: #fff; display: flex; align-items: center; justify-content: center; font: 800 9px/1 Arial,sans-serif; letter-spacing: .6px; box-shadow: inset 0 1px rgba(255,255,255,.22), inset 0 -2px rgba(0,0,0,.18), 0 2px 0 #697178; }
         .industrial-button:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 2px rgba(0,0,0,.18), 0 1px 0 #697178; }
         .industrial-button:disabled { opacity: .42; cursor: not-allowed; }
         .industrial-button.stop { background: #287b49; border-color: #175832; }
         .industrial-button.alarm-trigger { background: #c92f2f; border-color: #8e1d1d; }
         .button-symbol { width: 27px; height: 27px; border: 2px solid rgba(255,255,255,.75); display: grid; place-items: center; font-size: 15px; border-radius: 2px; }
-        @media (max-width: 650px) { .industrial-control { margin: 0 16px 24px; align-items: stretch; flex-direction: column; }.control-status { min-width: 0; }.control-buttons { grid-template-columns: 1fr 1fr; }.industrial-button { min-height: 54px; }.button-symbol { display: none; } }
+        @media (max-width: 650px) { .industrial-control { margin: 0 12px 20px; padding: 8px 9px; align-items: center; flex-direction: row; gap: 8px; }.control-status { min-width: 108px; padding: 7px 8px; }.control-status span { margin-bottom: 4px; font-size: 8px; }.control-status strong { font-size: 10px; }.control-buttons { margin-left: auto; grid-template-columns: repeat(2, 66px); gap: 6px; }.industrial-button { min-height: 34px; padding: 0 6px; }.button-symbol { display: none; } }
       `}</style>
     </main>
   );
