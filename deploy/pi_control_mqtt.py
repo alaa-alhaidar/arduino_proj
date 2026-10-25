@@ -20,6 +20,9 @@ COMMAND_TOPIC = os.getenv(
 STATE_TOPIC = os.getenv(
     "MQTT_PI_CONTROL_STATE_TOPIC", "htw/alaa/iot2026/pi-05/state/control"
 )
+TELEMETRY_CONTROL_TOPIC = os.getenv(
+    "MQTT_TELEMETRY_CONTROL_TOPIC", "htw/alaa/iot2026/nano-01/commands/telemetry"
+)
 SERVICES = ("pi-alarm.service", "pi-telemetry.service")
 MONITOR_DB = os.getenv("MONITOR_DB", "/home/alaa/network-monitor~/data/monitor.sqlite3")
 TOLERANCE_FILE = os.getenv("TOLERANCE_FILE", "/home/alaa/pi-control/tolerance.json")
@@ -79,7 +82,9 @@ def alarm_state():
     return state
 
 
-def control_services(action):
+def control_services(client, action):
+    if action == "stop":
+        client.publish(TELEMETRY_CONTROL_TOPIC, "stop", qos=1, retain=True)
     result = subprocess.run(
         ["systemctl", "--user", action, *SERVICES],
         capture_output=True,
@@ -89,6 +94,8 @@ def control_services(action):
     )
     if result.returncode:
         raise RuntimeError(result.stderr.strip() or "Dienstesteuerung fehlgeschlagen")
+    if action == "start":
+        client.publish(TELEMETRY_CONTROL_TOPIC, "start", qos=1, retain=True)
     return current_status()
 
 
@@ -109,7 +116,7 @@ def handle_command(client, payload):
             elif action == "alarm_state":
                 data = alarm_state()
             elif action in {"start", "stop"}:
-                data = control_services(action)
+                data = control_services(client, action)
             else:
                 raise ValueError("Ungültige Aktion")
             response = {"request_id": request_id, "ok": True, "data": data}
