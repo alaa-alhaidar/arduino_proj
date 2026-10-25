@@ -37,7 +37,8 @@
 .camera-panel { min-width: 0; max-width: none; margin: 0; overflow: hidden; border: 1px solid #b7c5d2; border-radius: 10px; background: #182128; box-shadow: 0 5px 20px rgba(19,35,52,.16); }
 .camera-panel header { min-height: 42px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; color: #e8f1f5; background: #26343e; font: 700 12px monospace; }
 .camera-panel header span { display: flex; align-items: center; gap: 8px; }
-.camera-panel header i { width: 8px; height: 8px; border-radius: 50%; background: #31c278; box-shadow: 0 0 7px #31c278; }
+.camera-panel header i { width: 8px; height: 8px; border-radius: 50%; background: #8a949e; box-shadow: none; }
+.camera-panel.online header i { background: #31c278; box-shadow: 0 0 7px #31c278; }
 .camera-panel header button { border: 0; padding: 3px 8px; color: #dce7e9; background: transparent; font-size: 24px; cursor: pointer; }
 .camera-stage { min-height: 300px; display: grid; place-items: center; align-content: center; gap: 8px; color: #dce7e9; text-align: center; }
 .camera-stage img { display: block; width: 100%; max-height: 70vh; object-fit: contain; }

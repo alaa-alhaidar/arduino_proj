@@ -322,8 +322,8 @@ export default function Dashboard() {
         </div>
       </nav>
       <div className="monitoring-workspace camera-active">
-        <section className="camera-panel" id="camera-view" aria-label="Node 2 Livebild">
-          <header><span><i /> Node 2 · Live</span></header>
+        <section className={`camera-panel ${cameraOnline ? "online" : "offline"}`} id="camera-view" aria-label="Node 2 Livebild">
+          <header><span><i /> Node 2 · {cameraOnline ? "Live" : "Offline"}</span></header>
           <div className="camera-stage">
             {cameraFrameUrl && !cameraError ? (
               <img
