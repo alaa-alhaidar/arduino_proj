@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Sensor Campus – MQTT-Prozess mit EMQX Cloud</title>
+  <desc id="desc">Architekturdiagramm des Messdatenflusses vom Sensor über öffentliche MQTT-Infrastruktur und Pi 5 zu EMQX Cloud, Vercel und PWA sowie des Rückwegs für Steuerbefehle.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fafc"/>
+      <stop offset="1" stop-color="#edf3f8"/>
+    </linearGradient>
+    <linearGradient id="emqx" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6246ea"/>
+      <stop offset="1" stop-color="#3827a8"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#16324f" flood-opacity=".13"/>
+    </filter>
+    <marker id="arrowBlue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M1 1l10 5-10 5z" fill="#2676b9"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M1 1l10 5-10 5z" fill="#d04b4b"/>
+    </marker>
+    <style>
+      .title{font:800 38px Arial,sans-serif;fill:#17324d}.subtitle{font:400 18px Arial,sans-serif;fill:#60758a}
+      .lane{font:700 15px Arial,sans-serif;letter-spacing:1.8px;fill:#7b8da0}.box-title{font:700 22px Arial,sans-serif;fill:#17324d}
+      .box-copy{font:400 15px Arial,sans-serif;fill:#60758a}.white{fill:#fff}.white-copy{fill:#ded8ff}
+      .step{font:700 15px Arial,sans-serif;fill:#fff}.flow{fill:none;stroke:#2676b9;stroke-width:5;marker-end:url(#arrowBlue)}
+      .control{fill:none;stroke:#d04b4b;stroke-width:4;stroke-dasharray:10 9;marker-end:url(#arrowRed)}
+      .flow-label{font:700 14px Arial,sans-serif;fill:#2676b9}.control-label{font:700 14px Arial,sans-serif;fill:#b53d3d}
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#background)"/>
+  <text x="80" y="72" class="title">Sensor Campus – MQTT-Prozess</text>
+  <text x="80" y="105" class="subtitle">Messdaten und Steuerbefehle über getrennte Netze mit TLS-gesichertem EMQX Cloud Broker</text>
+
+  <text x="80" y="165" class="lane">FABRIK / SENSORNETZ</text>
+  <text x="598" y="165" class="lane">CLOUD-INFRASTRUKTUR</text>
+  <text x="1270" y="165" class="lane">BENUTZER</text>
+  <line x1="550" y1="145" x2="550" y2="785" stroke="#d7e1ea" stroke-width="2"/>
+  <line x1="1240" y1="145" x2="1240" y2="785" stroke="#d7e1ea" stroke-width="2"/>
+
+  <!-- Node 1 -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="220" width="330" height="150" rx="22" fill="#fff" stroke="#d8e3ec" stroke-width="2"/>
+    <circle cx="125" cy="265" r="22" fill="#e8f7f1"/>
+    <path d="M115 266h20M125 256v20" stroke="#269271" stroke-width="4" stroke-linecap="round"/>
+    <text x="165" y="260" class="box-title">Node 1</text>
+    <text x="165" y="288" class="box-copy">Arduino Nano ESP32 + BME688</text>
+    <text x="110" y="329" class="box-copy">Temperatur · Feuchte · Druck · Luftqualität</text>
+    <text x="110" y="351" class="box-copy">Intervall: 1 Messwert pro Minute</text>
+  </g>
+
+  <!-- public ingress -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="455" width="330" height="140" rx="22" fill="#fff" stroke="#d8e3ec" stroke-width="2"/>
+    <circle cx="125" cy="500" r="22" fill="#e9f3fb"/>
+    <path d="M111 504c8-18 22-18 29 0M116 511c5-10 14-10 19 0" fill="none" stroke="#2676b9" stroke-width="3" stroke-linecap="round"/>
+    <text x="165" y="495" class="box-title">MQTT-Eingang</text>
+    <text x="165" y="523" class="box-copy">Bestehender Sensor-Topic</text>
+    <text x="110" y="561" class="box-copy">Retained JSON · QoS 1 · TLS</text>
+  </g>
+
+  <!-- Pi -->
+  <g filter="url(#shadow)">
+    <rect x="610" y="220" width="360" height="185" rx="22" fill="#fff" stroke="#d8e3ec" stroke-width="2"/>
+    <rect x="645" y="255" width="50" height="50" rx="10" fill="#17324d"/>
+    <path d="M657 270h26M657 280h26M657 290h17" stroke="#76d5be" stroke-width="4" stroke-linecap="round"/>
+    <text x="725" y="270" class="box-title">Kontrollstation Pi 5</text>
+    <text x="725" y="299" class="box-copy">MQTT-Brücke und Steuerdienst</text>
+    <text x="645" y="343" class="box-copy">• drosselt Telemetrie auf 1× pro Minute</text>
+    <text x="645" y="369" class="box-copy">• Alarm, Gerätestatus und Steuerbefehle</text>
+  </g>
+
+  <!-- EMQX -->
+  <g filter="url(#shadow)">
+    <rect x="610" y="485" width="360" height="180" rx="24" fill="url(#emqx)"/>
+    <circle cx="670" cy="540" r="31" fill="#fff" fill-opacity=".14"/>
+    <path d="M653 540h34M670 523v34M658 528l24 24M682 528l-24 24" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+    <text x="725" y="535" class="box-title white">EMQX Cloud</text>
+    <text x="725" y="565" class="box-copy white-copy">Privater MQTT-Broker</text>
+    <text x="645" y="608" class="box-copy white-copy">TLS 8883 · Benutzerkonto · Authentifizierung</text>
+    <text x="645" y="635" class="box-copy white-copy">Topics für Telemetrie, Status und Befehle</text>
+  </g>
+
+  <!-- Vercel -->
+  <g filter="url(#shadow)">
+    <rect x="1040" y="485" width="160" height="180" rx="22" fill="#17212b"/>
+    <path d="M1082 548l38-61 38 61z" fill="#fff"/>
+    <text x="1120" y="590" class="box-title white" text-anchor="middle">Vercel</text>
+    <text x="1120" y="619" class="box-copy" fill="#b9c5ce" text-anchor="middle">PWA API</text>
+    <text x="1120" y="644" class="box-copy" fill="#b9c5ce" text-anchor="middle">Secrets geschützt</text>
+  </g>
+
+  <!-- PWA -->
+  <g filter="url(#shadow)">
+    <rect x="1290" y="455" width="230" height="210" rx="24" fill="#fff" stroke="#d8e3ec" stroke-width="2"/>
+    <rect x="1360" y="485" width="90" height="125" rx="14" fill="#17324d"/>
+    <rect x="1370" y="499" width="70" height="85" rx="6" fill="#eef6fb"/>
+    <circle cx="1405" cy="596" r="6" fill="#76d5be"/>
+    <text x="1405" y="638" class="box-title" text-anchor="middle">PWA</text>
+    <text x="1405" y="660" class="box-copy" text-anchor="middle">Werte · Alarm · Livebild</text>
+  </g>
+
+  <!-- data arrows -->
+  <path d="M245 370v69" class="flow"/>
+  <circle cx="245" cy="404" r="15" fill="#2676b9"/><text x="245" y="409" class="step" text-anchor="middle">1</text>
+  <path d="M410 525h95q45 0 45-45V350q0-40 40-40h6" class="flow"/>
+  <circle cx="520" cy="525" r="15" fill="#2676b9"/><text x="520" y="530" class="step" text-anchor="middle">2</text>
+  <text x="445" y="500" class="flow-label">MQTT/TLS</text>
+  <path d="M790 405v66" class="flow"/>
+  <circle cx="790" cy="442" r="15" fill="#2676b9"/><text x="790" y="447" class="step" text-anchor="middle">3</text>
+  <text x="810" y="447" class="flow-label">Weiterleitung</text>
+  <path d="M970 575h56" class="flow"/>
+  <circle cx="1003" cy="575" r="15" fill="#2676b9"/><text x="1003" y="580" class="step" text-anchor="middle">4</text>
+  <path d="M1200 575h76" class="flow"/>
+  <circle cx="1244" cy="575" r="15" fill="#2676b9"/><text x="1244" y="580" class="step" text-anchor="middle">5</text>
+  <text x="1210" y="550" class="flow-label">HTTPS</text>
+
+  <!-- control return -->
+  <path d="M1405 685v62q0 30-30 30H790q-45 0-45-45v-53" class="control"/>
+  <text x="1005" y="765" class="control-label">Steuerbefehle: PWA → Vercel → EMQX Cloud → Pi 5</text>
+
+  <!-- legend -->
+  <g transform="translate(80 825)">
+    <line x1="0" y1="0" x2="55" y2="0" class="flow"/>
+    <text x="75" y="5" class="box-copy">Messdaten / Status</text>
+    <line x1="280" y1="0" x2="335" y2="0" class="control"/>
+    <text x="355" y="5" class="box-copy">Steuerbefehl</text>
+    <text x="790" y="5" class="box-copy">Alle externen Verbindungen verschlüsselt (TLS/HTTPS)</text>
+  </g>
+</svg>
