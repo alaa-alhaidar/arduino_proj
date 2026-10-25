@@ -293,7 +293,12 @@ export default function Dashboard() {
             <strong>{liveTimeText}</strong>
           </time>
           <div className="connection-info">
-            <div className={`live ${connection !== "ok" ? "offline" : ""}`}><i /> {connection === "ok" ? "Sensordaten live" : connection === "error" ? "Keine Sensordaten" : "Verbindung …"}</div>
+            <div
+              className={`live status-dot ${connection !== "ok" ? "offline" : ""}`}
+              role="status"
+              aria-label={connection === "ok" ? "Sensordaten online" : connection === "error" ? "Sensordaten offline" : "Verbindung wird aufgebaut"}
+              title={connection === "ok" ? "Sensordaten online" : connection === "error" ? "Sensordaten offline" : "Verbindung wird aufgebaut"}
+            ><i /></div>
             <time dateTime={lastReading ?? undefined} title={lastReadingDate ? lastReadingDate.toLocaleString("de-DE") : undefined}>{lastReadingText}</time>
           </div>
         </div>

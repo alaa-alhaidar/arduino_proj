@@ -74,4 +74,5 @@
 /* Opaque sticky header stays crisp and visible while the dashboard scrolls. */
 .topbar{position:sticky;top:0;z-index:100;background:#fff;box-shadow:0 2px 10px rgba(18,59,109,.08);isolation:isolate}
 @media(max-width:540px){.topbar{min-height:64px;padding:8px 12px}.brand{gap:8px}.brandmark{width:32px;height:32px;border-radius:8px}.brandmark span{bottom:6px;transform:scale(.82);transform-origin:bottom}.brand strong{max-width:64px;font-size:13px;line-height:1.05}.live-clock span{font-size:7px}.live-clock strong{font-size:13px}.live{padding:5px 7px;font-size:8px;white-space:nowrap}}
+.connection-info{align-items:center;flex-direction:row;gap:6px}.live.status-dot{width:18px;height:18px;padding:0;display:grid;place-items:center}.live.status-dot i{width:8px;height:8px;margin:0}.topbar .connection-info time{display:block;font-variant-numeric:tabular-nums}
 
