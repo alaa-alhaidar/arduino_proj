@@ -1,0 +1,15 @@
+[Unit]
+Description=Sensor Campus MQTT telemetry bridge
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/home/alaa/.config/sensor-campus/control.env
+ExecStart=/home/alaa/pi-alarm/venv/bin/python /home/alaa/pi-control/pi_mqtt_bridge.py
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
