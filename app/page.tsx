@@ -14,8 +14,8 @@ type Range = { min: number; max: number };
 type Ranges = Record<keyof Measurements, Range>;
 type ChartPoint = { value: number; receivedAt: number };
 type IoTDevice = { ip: string; name: string; hostname: string; online: boolean; lastChecked: string };
-const CHART_WINDOW_MS = 60_000;
-const SENSOR_POLL_MS = 1_000;
+const CHART_WINDOW_MS = 10 * 60_000;
+const SENSOR_POLL_MS = 10_000;
 
 function Sparkline({ data, tone, label, unit, limits }: { data: ChartPoint[]; tone: string; label: string; unit: string; limits?: Range }) {
   const width = 240;
@@ -67,7 +67,7 @@ function Sparkline({ data, tone, label, unit, limits }: { data: ChartPoint[]; to
       </>}
       <text className="axis-value" x={left - 5} y={top + 3} textAnchor="end">{axisNumber(maximum)} {unit}</text>
       <text className="axis-value" x={left - 5} y={height - bottom + 3} textAnchor="end">{axisNumber(minimum)} {unit}</text>
-      <text className="axis-time" x={left} y={height - 4}>−1 min</text>
+      <text className="axis-time" x={left} y={height - 4}>−10 min</text>
       <text className="axis-time" x={width - right} y={height - 4} textAnchor="end">jetzt</text>
     </svg>
   );
@@ -103,8 +103,10 @@ export default function Dashboard() {
         if (!response.ok) throw new Error("No data");
         const data = await response.json();
         setMeasurements(data.measurements);
-        const receivedAt = Date.now();
-        const timestamp = data.sent_at || new Date(receivedAt).toISOString();
+        const fetchedAt = Date.now();
+        const timestamp = data.sent_at || new Date(fetchedAt).toISOString();
+        const parsedTimestamp = Date.parse(timestamp);
+        const receivedAt = Number.isNaN(parsedTimestamp) ? fetchedAt : parsedTimestamp;
         const sampleId = `${data.boot_id ?? "sensor"}:${data.sequence ?? timestamp}`;
         setLastReading(timestamp);
         setHistory((current) => {
