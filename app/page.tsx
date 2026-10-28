@@ -167,6 +167,7 @@ export default function Dashboard() {
         const running = data.running === true;
         setStationRunning(running);
         if (data.alarm_control) {
+          if (data.alarm_control.ranges) setRanges(data.alarm_control.ranges);
           setAlarmOn(data.alarm_control.alarm_active === true);
           setAutomaticAlarm(data.alarm_control.automatic_alarm === true);
           setAlarmAcknowledged(data.alarm_control.automatic_alarm_acknowledged === true);
