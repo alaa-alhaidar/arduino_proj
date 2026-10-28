@@ -299,7 +299,10 @@ export default function Dashboard() {
               aria-label={connection === "ok" ? "Sensordaten online" : connection === "error" ? "Sensordaten offline" : "Verbindung wird aufgebaut"}
               title={connection === "ok" ? "Sensordaten online" : connection === "error" ? "Sensordaten offline" : "Verbindung wird aufgebaut"}
             ><i /></div>
-            <time dateTime={lastReading ?? undefined} title={lastReadingDate ? lastReadingDate.toLocaleString("de-DE") : undefined}>{lastReadingText}</time>
+            <div className="last-measurement">
+              <time dateTime={lastReading ?? undefined} title={lastReadingDate ? lastReadingDate.toLocaleString("de-DE") : undefined}>{lastReadingText}</time>
+              <small>Letzte Messung</small>
+            </div>
           </div>
         </div>
       </header>

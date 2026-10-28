@@ -78,5 +78,6 @@
 
 /* Prominent, readable live clock and last measurement time. */
 .live-clock strong{font-size:23px;line-height:1.1}.topbar .connection-info time{color:#173b67;font:800 16px/1.1 Manrope,sans-serif;letter-spacing:.35px}
-@media(max-width:540px){.live-clock strong{font-size:17px}.topbar .connection-info time{font-size:13px}.live.status-dot{width:16px;height:16px}}
+.last-measurement{display:flex;align-items:flex-end;flex-direction:column;gap:2px}.last-measurement small{color:#7b8795;font-size:9px;font-weight:700;line-height:1;text-transform:uppercase;letter-spacing:.45px}
+@media(max-width:540px){.live-clock strong{font-size:17px}.topbar .connection-info time{font-size:13px}.last-measurement small{font-size:7px}.live.status-dot{width:16px;height:16px}}
 
