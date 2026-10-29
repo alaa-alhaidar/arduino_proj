@@ -201,13 +201,31 @@ export default function Dashboard() {
       setCameraError(true);
       return;
     }
-    const updateFrame = () => {
-      setCameraError(false);
-      setCameraFrameUrl(`/api/camera?t=${Date.now()}`);
+    let cancelled = false;
+    let timer: number | undefined;
+    let hasFrame = false;
+
+    const loadNextFrame = () => {
+      const nextFrame = new Image();
+      nextFrame.onload = () => {
+        if (cancelled) return;
+        hasFrame = true;
+        setCameraFrameUrl(nextFrame.src);
+        setCameraError(false);
+        timer = window.setTimeout(loadNextFrame, 1000);
+      };
+      nextFrame.onerror = () => {
+        if (cancelled) return;
+        if (!hasFrame) setCameraError(true);
+        timer = window.setTimeout(loadNextFrame, 1500);
+      };
+      nextFrame.src = `/api/camera?t=${Date.now()}`;
     };
-    updateFrame();
-    const timer = window.setInterval(updateFrame, 1000);
-    return () => window.clearInterval(timer);
+    loadNextFrame();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [cameraOnline]);
 
   const formatNumber = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -338,7 +356,6 @@ export default function Dashboard() {
           <div className="camera-stage">
             {cameraFrameUrl && !cameraError ? (
               <img
-                key={cameraFrameUrl}
                 src={cameraFrameUrl}
                 alt="Livebild von Node 2"
                 decoding="async"
