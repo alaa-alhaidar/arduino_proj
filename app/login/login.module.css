@@ -1,0 +1,91 @@
+.page {
+  min-height: 100dvh;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 15% 12%, rgba(62, 184, 149, .12), transparent 28%),
+    linear-gradient(145deg, #eef3f8 0%, #f8fafc 55%, #e8eef5 100%);
+}
+
+.card {
+  width: min(100%, 410px);
+  padding: 30px;
+  border: 1px solid #d7e0e9;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 22px 60px rgba(18, 59, 109, .14);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #17263a;
+}
+
+.brand strong {
+  font: 800 20px Manrope, sans-serif;
+  letter-spacing: -.4px;
+}
+
+.brandmark {
+  width: 42px;
+  height: 42px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 11px;
+  background: #123b6d;
+}
+
+.brandmark span {
+  width: 7px;
+  position: absolute;
+  bottom: 9px;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.brandmark span:nth-child(1) { height: 12px; left: 9px; }
+.brandmark span:nth-child(2) { height: 22px; left: 19px; background: #71d2bd; }
+.brandmark span:nth-child(3) { height: 17px; left: 29px; }
+
+.heading { margin: 34px 0 26px; }
+.heading p { margin: 0 0 8px; color: #738195; font: 700 10px monospace; letter-spacing: 1.6px; }
+.heading h1 { margin: 0; color: #123b6d; font: 800 30px/1.15 Manrope, sans-serif; }
+.heading span { display: block; margin-top: 8px; color: #7b8796; font-size: 13px; }
+
+.form { display: grid; gap: 17px; }
+.form label { display: grid; gap: 7px; color: #536174; font-size: 12px; font-weight: 700; }
+.form input {
+  width: 100%;
+  height: 46px;
+  padding: 0 13px;
+  border: 1px solid #cbd6e1;
+  border-radius: 9px;
+  outline: none;
+  color: #17263a;
+  background: #fff;
+  font: 500 14px "DM Sans", sans-serif;
+}
+.form input:focus { border-color: #2389c9; box-shadow: 0 0 0 3px rgba(35, 137, 201, .13); }
+.form button {
+  min-height: 46px;
+  margin-top: 5px;
+  border: 0;
+  border-radius: 9px;
+  color: #fff;
+  background: #123b6d;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .7px;
+}
+.form button:hover { background: #0e315c; }
+.note { display: block; margin-top: 20px; color: #98a3af; font-size: 10px; text-align: center; }
+
+@media (max-width: 480px) {
+  .page { padding: 16px; align-items: center; }
+  .card { padding: 24px 20px; border-radius: 15px; }
+  .heading { margin: 28px 0 23px; }
+  .heading h1 { font-size: 27px; }
+}
