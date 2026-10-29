@@ -7,7 +7,8 @@ export async function requestPi<T>(action: PiAction): Promise<T> {
   const token = process.env.PI_CONTROL_TOKEN;
   if (!token) throw new Error("Pi-MQTT-Steuerung ist nicht konfiguriert");
 
-  const brokerUrl = process.env.MQTT_URL ?? "mqtt://127.0.0.1:18830";
+  const brokerUrl = process.env.MQTT_URL
+    ?? "mqtts://jfa0c01f.ala.eu-central-1.emqxsl.com:8883";
   const commandTopic = process.env.MQTT_PI_CONTROL_TOPIC
     ?? "htw/alaa/iot2026/pi-05/commands/control";
   const stateTopic = process.env.MQTT_PI_CONTROL_STATE_TOPIC

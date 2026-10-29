@@ -30,8 +30,8 @@ Die PWA liest die Nano-Sensordaten verschlüsselt über MQTT/TLS auf Port 8883 a
 htw/alaa/iot2026/nano-01/telemetry
 ```
 
-Der Pi 5 verwendet für Telemetrie, Alarmsteuerung und Kontrollbefehle
-`broker.emqx.io:8883` mit dem System-CA-Speicher. Die eigenständige
+Nano, Pi 5 und PWA verwenden für Telemetrie, Alarmsteuerung und Kontrollbefehle
+denselben privaten EMQX-Cloud-Broker mit dem System-CA-Speicher. Die eigenständige
 Nano-Firmware liegt außerhalb dieses PWA-Projekts im Ordner `arduino-code`.
 
 Der Pi 5 muss dort retained JSON-Nachrichten in diesem Format veröffentlichen:
@@ -53,14 +53,14 @@ Der Pi 5 muss dort retained JSON-Nachrichten in diesem Format veröffentlichen:
 
 Die Python-Dienste für GPIO, MQTT und die Kontroll-API laufen separat auf dem
 Pi 5. Wenn Next.js lokal auf dem Mac läuft, verbindet es sich über `MQTT_URL`
-verschlüsselt mit dem öffentlichen MQTT-Broker.
+verschlüsselt mit demselben privaten EMQX-Cloud-Broker.
 
 ## Kamera-Relay
 
 `deploy/pi_camera_relay.py` nimmt JPEG-Frames des ESP32-S3-CAM auf dem Pi 5
-entgegen. Upload und Abruf verwenden getrennte Bearer-Tokens. Die PWA ruft
-`/api/camera` auf; dadurch bleibt das Viewer-Token ausschließlich auf dem
-Server und wird nicht an den Browser ausgeliefert.
+entgegen und verteilt neue Frames sofort an verbundene WebSocket-Clients.
+Die PWA erhält über `/api/camera/session` eine kurzlebige, signierte WSS-URL;
+dadurch bleibt das Viewer-Token ausschließlich auf dem Server.
 
 Pi-Konfiguration in `/home/alaa/.config/sensor-campus/camera.env`:
 
@@ -69,9 +69,10 @@ CAMERA_UPLOAD_TOKEN=<zufälliges langes Token>
 CAMERA_VIEW_TOKEN=<anderes zufälliges langes Token>
 CAMERA_RELAY_HOST=127.0.0.1
 CAMERA_RELAY_PORT=8766
+CAMERA_WS_HOST=127.0.0.1
+CAMERA_WS_PORT=8767
 ```
 
 Die öffentliche PWA benötigt `CAMERA_RELAY_URL` und dasselbe
-`CAMERA_VIEW_TOKEN`. Das Relay muss über einen HTTPS-Tunnel oder Reverse Proxy
-erreichbar gemacht werden. Bis die neue Kamera eintrifft, kann der Pi-Dienst
-bereits installiert und über `/health` geprüft werden.
+`CAMERA_VIEW_TOKEN`. Port 8767 wird über einen HTTPS-/WebSocket-Tunnel oder
+Reverse Proxy veröffentlicht; der Upload-Port 8766 bleibt im lokalen Netz.

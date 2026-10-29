@@ -68,7 +68,8 @@ export async function GET() {
     return NextResponse.json({ error: "Pi-Kontrollstation über MQTT nicht erreichbar" }, { status: 503 });
   }
 
-  const brokerUrl = process.env.MQTT_URL ?? "mqtt://127.0.0.1:18830";
+  const brokerUrl = process.env.MQTT_URL
+    ?? "mqtts://jfa0c01f.ala.eu-central-1.emqxsl.com:8883";
   const topic = process.env.MQTT_TELEMETRY_TOPIC ?? "iot/v1/nodes/pi-05/telemetry";
 
   let client: Awaited<ReturnType<typeof connectAsync>> | undefined;

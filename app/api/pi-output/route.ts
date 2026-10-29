@@ -17,7 +17,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "enabled muss true oder false sein" }, { status: 400 });
   }
 
-  const brokerUrl = process.env.MQTT_URL ?? "mqtt://127.0.0.1:18830";
+  const brokerUrl = process.env.MQTT_URL
+    ?? "mqtts://jfa0c01f.ala.eu-central-1.emqxsl.com:8883";
   const topic = process.env.MQTT_ALARM_TOPIC ?? "iot/v1/nodes/pi-05/commands/alarm";
   const stateTopic = process.env.MQTT_ALARM_STATE_TOPIC ?? "iot/v1/nodes/pi-05/state/alarm";
   const requestId = randomUUID();

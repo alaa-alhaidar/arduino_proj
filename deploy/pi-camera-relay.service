@@ -4,7 +4,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/alaa/pi-control/pi_camera_relay.py
+ExecStart=/home/alaa/pi-alarm/venv/bin/python /home/alaa/pi-control/pi_camera_relay.py
 EnvironmentFile=/home/alaa/.config/sensor-campus/camera.env
 Restart=always
 RestartSec=3

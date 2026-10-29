@@ -1,0 +1,13 @@
+[Unit]
+Description=HTTPS tunnel for Sensor Campus camera relay
+After=network-online.target pi-camera-relay.service
+Requires=pi-camera-relay.service
+
+[Service]
+Type=simple
+ExecStart=/home/alaa/.local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8767
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

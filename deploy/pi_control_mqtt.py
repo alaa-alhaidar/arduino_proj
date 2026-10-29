@@ -11,7 +11,9 @@ import paho.mqtt.client as mqtt
 
 
 TOKEN = os.environ["PI_CONTROL_TOKEN"]
-MQTT_HOST = os.getenv("PUBLIC_MQTT_HOST", "broker.emqx.io")
+MQTT_HOST = os.getenv(
+    "PUBLIC_MQTT_HOST", "jfa0c01f.ala.eu-central-1.emqxsl.com"
+)
 MQTT_PORT = int(os.getenv("PUBLIC_MQTT_PORT", "8883"))
 MQTT_CA_FILE = os.getenv("PUBLIC_MQTT_CA_FILE", "/etc/ssl/certs/ca-certificates.crt")
 COMMAND_TOPIC = os.getenv(
