@@ -94,6 +94,7 @@ export default function Dashboard() {
   const [cameraError, setCameraError] = useState(false);
   const cameraOnline = devices.some((device) =>
     device.online && /cam|kamera/i.test(`${device.name} ${device.hostname}`));
+  const cameraActive = cameraOnline && stationRunning !== false;
 
   useEffect(() => {
     navigator.serviceWorker?.register("/sw.js").catch(() => undefined);
@@ -196,7 +197,7 @@ export default function Dashboard() {
   }, [stationPending]);
 
   useEffect(() => {
-    if (!cameraOnline) {
+    if (!cameraActive) {
       setCameraFrameUrl(null);
       setCameraError(true);
       return;
@@ -232,7 +233,7 @@ export default function Dashboard() {
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [cameraOnline]);
+  }, [cameraActive]);
 
   const formatNumber = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const lastReadingDate = lastReading ? new Date(lastReading) : null;
@@ -357,8 +358,8 @@ export default function Dashboard() {
         </div>
       </nav>
       <div className="monitoring-workspace camera-active">
-        <section className={`camera-panel ${cameraOnline ? "online" : "offline"}`} id="camera-view" aria-label="Node 2 Livebild">
-          <header><span><i /> Node 2 · {cameraOnline ? "Live" : "Offline"}</span></header>
+        <section className={`camera-panel ${cameraActive ? "online" : "offline"}`} id="camera-view" aria-label="Node 2 Livebild">
+          <header><span><i /> Node 2 · {cameraActive ? "Live" : "Offline"}</span></header>
           <div className="camera-stage">
             {cameraFrameUrl && !cameraError ? (
               <img
@@ -372,7 +373,7 @@ export default function Dashboard() {
               <>
                 <span className="camera-placeholder" aria-hidden="true">▣</span>
                 <strong>Livebild nicht verfügbar</strong>
-                <small>{cameraOnline ? "Verbindung wird aufgebaut …" : "Kamera offline"}</small>
+                <small>{stationRunning === false ? "Kontrollstation gestoppt" : cameraOnline ? "Verbindung wird aufgebaut …" : "Kamera offline"}</small>
               </>
             )}
           </div>
