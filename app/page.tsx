@@ -324,6 +324,14 @@ export default function Dashboard() {
     }
   }
 
+  async function logout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.assign("/login");
+    }
+  }
+
   return (
     <main>
       <header className="topbar">
@@ -345,6 +353,7 @@ export default function Dashboard() {
               <small>Letzte Messung</small>
             </div>
           </div>
+          <button className="logout-button" type="button" onClick={logout} title="Abmelden" aria-label="Abmelden">Abmelden</button>
         </div>
       </header>
       <nav className="device-nav" aria-label="Vernetzte IoT-Geräte">

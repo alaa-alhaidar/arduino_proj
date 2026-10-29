@@ -83,5 +83,6 @@
 /* Prominent, readable live clock and last measurement time. */
 .live-clock strong{font-size:23px;line-height:1.1}.topbar .connection-info time{color:#173b67;font:800 16px/1.1 Manrope,sans-serif;letter-spacing:.35px}
 .last-measurement{display:flex;align-items:flex-end;flex-direction:column;gap:2px}.last-measurement small{color:#7b8795;font-size:9px;font-weight:700;line-height:1;text-transform:uppercase;letter-spacing:.45px}
-@media(max-width:540px){.live-clock strong{font-size:17px}.topbar .connection-info time{font-size:13px}.last-measurement small{font-size:7px}.live.status-dot{width:16px;height:16px}}
+.logout-button{height:32px;padding:0 11px;border:1px solid #d4dde7;border-radius:8px;color:#5f6e80;background:#f7f9fb;font-size:10px;font-weight:800;letter-spacing:.25px}.logout-button:hover{color:#9b3030;border-color:#e4bcbc;background:#fff4f4}
+@media(max-width:540px){.live-clock strong{font-size:17px}.topbar .connection-info time{font-size:13px}.last-measurement small{font-size:7px}.live.status-dot{width:16px;height:16px}.logout-button{width:28px;height:28px;padding:0;font-size:0}.logout-button::before{content:"↪";font-size:16px;line-height:1}}
 
