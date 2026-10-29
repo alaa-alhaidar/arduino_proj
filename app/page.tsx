@@ -353,7 +353,9 @@ export default function Dashboard() {
               <small>Letzte Messung</small>
             </div>
           </div>
-          <button className="logout-button" type="button" onClick={logout} title="Abmelden" aria-label="Abmelden">Abmelden</button>
+          <button className="logout-button" type="button" onClick={logout} title="Abmelden" aria-label="Abmelden">
+            <span aria-hidden="true">↪</span><b>Abmelden</b>
+          </button>
         </div>
       </header>
       <nav className="device-nav" aria-label="Vernetzte IoT-Geräte">
