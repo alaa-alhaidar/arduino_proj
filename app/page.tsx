@@ -207,7 +207,13 @@ export default function Dashboard() {
 
     const loadNextFrame = () => {
       const nextFrame = new Image();
-      nextFrame.onload = () => {
+      nextFrame.onload = async () => {
+        if (cancelled) return;
+        try {
+          await nextFrame.decode();
+        } catch {
+          // The loaded frame can still be displayed when explicit decoding is unavailable.
+        }
         if (cancelled) return;
         hasFrame = true;
         setCameraFrameUrl(nextFrame.src);
@@ -358,7 +364,7 @@ export default function Dashboard() {
               <img
                 src={cameraFrameUrl}
                 alt="Livebild von Node 2"
-                decoding="async"
+                decoding="sync"
                 onLoad={() => setCameraError(false)}
                 onError={() => setCameraError(true)}
               />
