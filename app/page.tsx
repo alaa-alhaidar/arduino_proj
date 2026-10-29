@@ -354,7 +354,10 @@ export default function Dashboard() {
             </div>
           </div>
           <button className="logout-button" type="button" onClick={logout} title="Abmelden" aria-label="Abmelden">
-            <span aria-hidden="true">↪</span><b>Abmelden</b>
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
+            </svg>
+            <b>Abmelden</b>
           </button>
         </div>
       </header>
