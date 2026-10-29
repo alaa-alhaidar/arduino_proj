@@ -54,7 +54,7 @@
 .monitoring-workspace.camera-active .sensor-grid{height:100%;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:12px}
 .monitoring-workspace.camera-active .sensor-card{padding:12px 13px 10px}
 .monitoring-workspace.camera-active .reading{margin:6px 0;font-size:22px}
-.monitoring-workspace.camera-active .sparkline{height:64px}
+.monitoring-workspace.camera-active .sparkline{width:100%;height:auto}
 .monitoring-workspace.camera-active .sparkline.empty{height:64px}
 .camera-panel{min-width:0;height:100%;margin:0;border:1px solid #cbd6e2;border-radius:14px;background:#101820;overflow:hidden;box-shadow:0 12px 34px rgba(17,37,58,.18);position:sticky;top:12px;display:flex;flex-direction:column}
 .camera-panel header{height:42px;padding:0 12px 0 15px;display:flex;align-items:center;justify-content:space-between;color:#e7edf3;background:#18232d}
