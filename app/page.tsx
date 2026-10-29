@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Measurements = {
   temperature_c: number;
@@ -92,6 +92,7 @@ export default function Dashboard() {
   const [devicesError, setDevicesError] = useState(false);
   const [cameraFrameUrl, setCameraFrameUrl] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState(false);
+  const cameraObjectUrl = useRef<string | null>(null);
   const cameraOnline = devices.some((device) =>
     device.online && /cam|kamera/i.test(`${device.name} ${device.hostname}`));
   const cameraActive = cameraOnline && stationRunning !== false;
@@ -198,40 +199,52 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!cameraActive) {
+      if (cameraObjectUrl.current) URL.revokeObjectURL(cameraObjectUrl.current);
+      cameraObjectUrl.current = null;
       setCameraFrameUrl(null);
       setCameraError(true);
       return;
     }
-    let cancelled = false;
-    let timer: number | undefined;
-    let hasFrame = false;
+    let disposed = false;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
 
-    const loadNextFrame = () => {
-      const nextFrame = new Image();
-      nextFrame.onload = async () => {
-        if (cancelled) return;
-        try {
-          await nextFrame.decode();
-        } catch {
-          // The loaded frame can still be displayed when explicit decoding is unavailable.
+    const connect = async () => {
+      try {
+        const response = await fetch("/api/camera/session", { cache: "no-store" });
+        if (!response.ok) throw new Error("Keine Kamera-Sitzung");
+        const session = await response.json() as { url: string };
+        if (disposed) return;
+        socket = new WebSocket(session.url);
+        socket.binaryType = "blob";
+        socket.onmessage = (event) => {
+          const nextUrl = URL.createObjectURL(event.data as Blob);
+          const previousUrl = cameraObjectUrl.current;
+          cameraObjectUrl.current = nextUrl;
+          setCameraFrameUrl(nextUrl);
+          setCameraError(false);
+          if (previousUrl) URL.revokeObjectURL(previousUrl);
+        };
+        socket.onerror = () => socket?.close();
+        socket.onclose = () => {
+          if (!disposed) reconnectTimer = window.setTimeout(connect, 2000);
+        };
+      } catch {
+        if (!disposed) {
+          setCameraError(true);
+          reconnectTimer = window.setTimeout(connect, 2000);
         }
-        if (cancelled) return;
-        hasFrame = true;
-        setCameraFrameUrl(nextFrame.src);
-        setCameraError(false);
-        timer = window.setTimeout(loadNextFrame, 1000);
-      };
-      nextFrame.onerror = () => {
-        if (cancelled) return;
-        if (!hasFrame) setCameraError(true);
-        timer = window.setTimeout(loadNextFrame, 1500);
-      };
-      nextFrame.src = `/api/camera?t=${Date.now()}`;
+      }
     };
-    loadNextFrame();
+
+    setCameraError(false);
+    connect();
     return () => {
-      cancelled = true;
-      if (timer !== undefined) window.clearTimeout(timer);
+      disposed = true;
+      socket?.close();
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      if (cameraObjectUrl.current) URL.revokeObjectURL(cameraObjectUrl.current);
+      cameraObjectUrl.current = null;
     };
   }, [cameraActive]);
 
@@ -438,7 +451,7 @@ export default function Dashboard() {
         .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
         .sensor-card.alarm .meter { background: #f2caca; }
         .sensor-card.alarm .meter span { background: #d93636; }
-        .control-deck { width: min(760px, calc(100% - 32px)); margin: 0 auto 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .control-deck { width: min(760px, calc(100% - 32px)); margin: 18px auto 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
         .control-deck :global(.station-control) { width: auto; max-width: none; min-height: 92px; margin: 0; padding: 14px; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); }
         .industrial-control { min-width: 0; margin: 0; padding: 14px; background: #fff; border: 1px solid #cbd5df; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .control-status { min-width: 0; padding: 0; background: transparent; border: 0; color: #253342; }
@@ -457,7 +470,7 @@ export default function Dashboard() {
         .industrial-button.stop { background: #287b49; border-color: #175832; }
         .industrial-button.alarm-trigger { background: #c92f2f; border-color: #8e1d1d; }
         .button-symbol { width: 27px; height: 27px; border: 2px solid rgba(255,255,255,.75); display: grid; place-items: center; font-size: 15px; border-radius: 2px; }
-        @media (max-width: 650px) { .control-deck { width: calc(100% - 24px); grid-template-columns: 1fr; gap: 8px; margin-bottom: 20px; }.control-deck :global(.station-control), .industrial-control { min-height: 76px; padding: 10px 12px; align-items: center; flex-direction: row; gap: 8px; }.control-status { min-width: 108px; padding: 0; }.control-status span { margin-bottom: 4px; font-size: 8px; }.control-status strong { font-size: 10px; }.control-buttons { margin-left: auto; grid-template-columns: repeat(2, 58px); gap: 6px; }.industrial-button { min-height: 32px; padding: 0 6px; }.button-symbol { display: none; } }
+        @media (max-width: 650px) { .control-deck { width: calc(100% - 24px); grid-template-columns: 1fr; gap: 12px; margin: 14px auto 20px; }.control-deck :global(.station-control), .industrial-control { min-height: 76px; padding: 10px 12px; align-items: center; flex-direction: row; gap: 8px; }.control-status { min-width: 108px; padding: 0; }.control-status span { margin-bottom: 4px; font-size: 8px; }.control-status strong { font-size: 10px; }.control-buttons { margin-left: auto; grid-template-columns: repeat(2, 58px); gap: 6px; }.industrial-button { min-height: 32px; padding: 0 6px; }.button-symbol { display: none; } }
       `}</style>
     </main>
   );
