@@ -81,6 +81,8 @@
   letter-spacing: .7px;
 }
 .form button:hover { background: #0e315c; }
+.form button:disabled { cursor: wait; opacity: .72; }
+.error { margin: -4px 0 0; color: #b42323; font-size: 11px; line-height: 1.4; }
 .note { display: block; margin-top: 20px; color: #98a3af; font-size: 10px; text-align: center; }
 
 @media (max-width: 480px) {

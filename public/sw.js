@@ -1,5 +1,5 @@
-const CACHE = "sensor-campus-v10";
-const SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
+const CACHE = "sensor-campus-v11";
+const SHELL = ["/login", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
@@ -22,6 +22,11 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(event.request));
     return;
   }
+  // Geschützte Seiten niemals offline speichern; ohne Serverprüfung kein Dashboard anzeigen.
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).catch(() => caches.match("/login")));
+    return;
+  }
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -29,6 +34,6 @@ self.addEventListener("fetch", (event) => {
         caches.open(CACHE).then((cache) => cache.put(event.request, copy));
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/login")))
   );
 });
