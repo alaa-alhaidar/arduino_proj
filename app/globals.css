@@ -50,7 +50,7 @@
 .camera-button.active .camera-glyph{color:#fff}
 .monitoring-workspace{max-width:1180px;margin:0 auto;padding:28px 28px 30px}
 .monitoring-workspace .sensor-grid{max-width:none;margin:0;padding:0}
-.monitoring-workspace.camera-active{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:16px}
+.monitoring-workspace.camera-active{height:clamp(360px,31vw,500px);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:16px}
 .monitoring-workspace.camera-active .sensor-grid{height:100%;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:12px}
 .monitoring-workspace.camera-active .sensor-card{padding:12px 13px 10px}
 .monitoring-workspace.camera-active .reading{margin:6px 0;font-size:22px}
@@ -67,7 +67,7 @@
 .camera-placeholder{font-size:36px;color:#60717f}
 .camera-stage strong{font:700 13px Manrope,sans-serif;color:#d5dde4}
 .camera-stage small{font-size:10px;color:#75838f}
-@media(max-width:950px){.monitoring-workspace.camera-active{grid-template-columns:1fr}.camera-panel{height:auto;position:static}.camera-stage{aspect-ratio:16/7}.monitoring-workspace.camera-active .sensor-grid{height:auto;grid-template-columns:repeat(4,minmax(210px,1fr));grid-template-rows:auto;overflow-x:auto;scroll-snap-type:x mandatory}.monitoring-workspace.camera-active .sensor-card{scroll-snap-align:start}}
+@media(max-width:950px){.monitoring-workspace.camera-active{height:auto;grid-template-columns:1fr}.camera-panel{height:auto;position:static}.camera-stage{aspect-ratio:16/7}.monitoring-workspace.camera-active .sensor-grid{height:auto;grid-template-columns:repeat(4,minmax(210px,1fr));grid-template-rows:auto;overflow-x:auto;scroll-snap-type:x mandatory}.monitoring-workspace.camera-active .sensor-card{scroll-snap-align:start}}
 @media(max-width:650px){.device-buttons{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px}.device-button{flex:0 0 auto}.monitoring-workspace{padding:18px 12px 20px}.camera-panel{border-radius:11px}.camera-stage{aspect-ratio:16/10;min-height:180px}.monitoring-workspace .sensor-grid,.monitoring-workspace.camera-active .sensor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:visible;padding-bottom:0;scroll-snap-type:none}.monitoring-workspace .sensor-card{min-width:0;min-height:0;padding:10px 8px 8px;scroll-snap-align:none}.monitoring-workspace .sensor-heading{font-size:9px}.monitoring-workspace .reading{font-size:18px}.monitoring-workspace .sparkline.empty{height:54px;font-size:8px}.station-buttons button{min-height:32px}.industrial-button{min-height:34px!important}.industrial-control{padding:8px 9px!important}}
 
 .live-clock{min-width:142px;padding-right:14px;border-right:1px solid #e1e7ee;display:flex;align-items:flex-end;flex-direction:column;font-variant-numeric:tabular-nums}
