@@ -206,7 +206,7 @@ export default function Dashboard() {
       setCameraFrameUrl(`/api/camera?t=${Date.now()}`);
     };
     updateFrame();
-    const timer = window.setInterval(updateFrame, 200);
+    const timer = window.setInterval(updateFrame, 1000);
     return () => window.clearInterval(timer);
   }, [cameraOnline]);
 
@@ -338,8 +338,10 @@ export default function Dashboard() {
           <div className="camera-stage">
             {cameraFrameUrl && !cameraError ? (
               <img
+                key={cameraFrameUrl}
                 src={cameraFrameUrl}
                 alt="Livebild von Node 2"
+                decoding="async"
                 onLoad={() => setCameraError(false)}
                 onError={() => setCameraError(true)}
               />
