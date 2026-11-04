@@ -1,0 +1,20 @@
+[Unit]
+Description=Sensor Campus controlled DoS demo guard (observation mode)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/home/alaa/.config/sensor-campus/control.env
+EnvironmentFile=/home/alaa/.config/sensor-campus/dos-guard.env
+ExecStart=/home/alaa/pi-alarm/venv/bin/python /home/alaa/pi-control/pi_dos_guard.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/home/alaa/pi-control
+
+[Install]
+WantedBy=default.target

@@ -49,6 +49,59 @@ Der Pi 5 muss dort retained JSON-Nachrichten in diesem Format veröffentlichen:
 }
 ```
 
+## Kontrollierte DoS-Demo auf dem Pi 5
+
+`deploy/pi_dos_guard.py` stellt auf dem separaten Laborport `8088` einen kleinen
+HTTP-Endpunkt bereit. Der Dienst zählt Anfragen pro Quell-IP in einem gleitenden
+Zeitfenster und veröffentlicht den aktuellen Zustand retained auf:
+
+```text
+htw/alaa/iot2026/pi-05/security/dos
+```
+
+Die Abwehr ist in `deploy/dos-guard.env.example` zunächst auf reines Beobachten
+gestellt. Mit `DOS_GUARD_ENFORCE=true` wird eine erkannte Quelle vorübergehend
+per `iptables` gesperrt. Die Regel gilt ausschließlich für TCP-Port `8088` und
+wird nach der konfigurierten Sperrdauer sowie beim sauberen Stoppen entfernt.
+SSH, MQTT, Kamera und Sensor-Telemetrie sind davon nicht betroffen.
+
+Installation auf dem Pi:
+
+```bash
+sudo /home/alaa/pi-alarm/venv/bin/pip install paho-mqtt
+sudo install -m 0755 deploy/pi_dos_guard.py /home/alaa/pi-control/pi_dos_guard.py
+sudo install -m 0644 deploy/pi-dos-guard.service /etc/systemd/system/pi-dos-guard.service
+sudo install -m 0600 deploy/dos-guard.env.example /home/alaa/.config/sensor-campus/dos-guard.env
+sudoedit /home/alaa/.config/sensor-campus/dos-guard.env
+sudo systemctl daemon-reload
+sudo systemctl enable --now pi-dos-guard.service
+```
+
+Vor dem Start müssen im Environment-File die vorhandenen MQTT-Zugangsdaten
+über `control.env` verfügbar sein. Der Dienst verwendet dieselbe
+Python-Umgebung wie die übrige Pi-Alarmsteuerung; dort muss `paho-mqtt`
+installiert sein. Ohne Root-Rechte kann alternativ
+`deploy/pi-dos-guard-user.service` als systemd-User-Dienst im sicheren
+Beobachtungsmodus verwendet werden.
+
+Ein harmloser Funktionstest erfolgt mit `curl http://PI-IP:8088/`. Status und
+Fehler zeigt `sudo systemctl status pi-dos-guard.service` beziehungsweise
+`sudo journalctl -u pi-dos-guard.service -f`.
+
+### Mac-Oberfläche für Testverkehr
+
+`demo_traffic_ui.py` startet ohne zusätzliche Python-Pakete eine ausschließlich
+lokal erreichbare Bedienoberfläche:
+
+```bash
+python3 demo_traffic_ui.py
+```
+
+Danach ist sie unter `http://127.0.0.1:8090` erreichbar. Sie akzeptiert nur
+private beziehungsweise lokale Ziel-IP-Adressen, verwendet fest den isolierten
+Demo-Port `8088` und begrenzt jeden Durchlauf auf maximal 200 Testanfragen mit
+höchstens zehn parallelen Verbindungen.
+
 ## Pi-5-Dienste
 
 Die Python-Dienste für GPIO, MQTT und die Kontroll-API laufen separat auf dem

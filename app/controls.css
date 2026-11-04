@@ -40,8 +40,13 @@
 .camera-panel header i { width: 8px; height: 8px; border-radius: 50%; background: #8a949e; box-shadow: none; }
 .camera-panel.online header i { background: #31c278; box-shadow: 0 0 7px #31c278; }
 .camera-panel header button { border: 0; padding: 3px 8px; color: #dce7e9; background: transparent; font-size: 24px; cursor: pointer; }
+.camera-panel header .camera-capture { width: auto; height: 30px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border: 2px solid #31c278; border-radius: 7px; color: #e9fff5; background: #24513f; box-shadow: 0 0 0 2px rgba(49,194,120,.12); font: 700 10px/1 monospace; }
+.camera-capture svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.camera-capture b { font: inherit; }
+.camera-panel header .camera-capture:hover:not(:disabled) { color: #fff; background: #2f7658; border-color: #66dda1; }
+.camera-panel header .camera-capture:disabled { opacity: .4; cursor: not-allowed; }
 .camera-stage { min-height: 300px; position: relative; z-index: 1; overflow: hidden; display: grid; place-items: center; align-content: center; gap: 8px; color: #dce7e9; text-align: center; }
-.camera-stage img { display: block; width: 100%; height: 100%; max-height: none; object-fit: cover; object-position: center; }
+.camera-stage img { display: block; width: 100%; height: 100%; max-height: none; object-fit: contain; object-position: center; }
 .camera-stage small { color: #96a5aa; }
 .camera-placeholder { color: #52636e; font-size: 58px; }
 

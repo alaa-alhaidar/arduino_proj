@@ -32,6 +32,7 @@ latest_frame: bytes | None = None
 latest_frame_at = 0.0
 ws_loop: asyncio.AbstractEventLoop | None = None
 ws_clients: set[ServerConnection] = set()
+ws_ready: set[ServerConnection] = set()
 
 
 def authorized(header: str | None, expected_token: str) -> bool:
@@ -99,17 +100,30 @@ async def websocket_handler(connection: ServerConnection) -> None:
             frame_age = time.monotonic() - latest_frame_at
         if frame is not None and frame_age <= MAX_FRAME_AGE_SECONDS:
             await connection.send(frame)
-        await connection.wait_closed()
+        else:
+            ws_ready.add(connection)
+        async for message in connection:
+            if message == "next":
+                ws_ready.add(connection)
     finally:
         ws_clients.discard(connection)
+        ws_ready.discard(connection)
 
 
 async def broadcast_frame(frame: bytes) -> None:
-    if ws_clients:
-        await asyncio.gather(
-            *(client.send(frame) for client in tuple(ws_clients)),
-            return_exceptions=True,
-        )
+    clients = tuple(ws_ready)
+    if not clients:
+        return
+    for client in clients:
+        ws_ready.discard(client)
+    results = await asyncio.gather(
+        *(client.send(frame) for client in clients),
+        return_exceptions=True,
+    )
+    for client, result in zip(clients, results):
+        if isinstance(result, Exception):
+            ws_clients.discard(client)
+            ws_ready.discard(client)
 
 
 async def run_websocket_server() -> None:

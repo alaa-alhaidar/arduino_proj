@@ -1,0 +1,13 @@
+.venv/
+.venv-mqtt/
+.next/
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+arduino/
+deploy/
+report-assets/
+README.txt
+readmme-verbindung-ssh.md
+ssh.md

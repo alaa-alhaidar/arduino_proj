@@ -217,6 +217,7 @@ export default function Dashboard() {
         if (disposed) return;
         socket = new WebSocket(session.url);
         socket.binaryType = "blob";
+        socket.onopen = () => socket?.send("next");
         socket.onmessage = (event) => {
           const nextUrl = URL.createObjectURL(event.data as Blob);
           const previousUrl = cameraObjectUrl.current;
@@ -224,6 +225,7 @@ export default function Dashboard() {
           setCameraFrameUrl(nextUrl);
           setCameraError(false);
           if (previousUrl) URL.revokeObjectURL(previousUrl);
+          if (socket?.readyState === WebSocket.OPEN) socket.send("next");
         };
         socket.onerror = () => socket?.close();
         socket.onclose = () => {
@@ -253,6 +255,9 @@ export default function Dashboard() {
   const lastReadingText = !lastReadingDate || Number.isNaN(lastReadingDate.getTime())
     ? "--:--:--"
     : lastReadingDate.toLocaleTimeString("de-DE");
+  const lastReadingDateText = !lastReadingDate || Number.isNaN(lastReadingDate.getTime())
+    ? "--.--.----"
+    : lastReadingDate.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" });
   const liveDate = new Date(now);
   const liveDateText = liveDate.toLocaleDateString("de-DE", {
     weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin",
@@ -332,6 +337,17 @@ export default function Dashboard() {
     }
   }
 
+  function captureCameraImage() {
+    if (!cameraFrameUrl) return;
+    const timestamp = new Date().toISOString().replaceAll(":", "-").replace("T", "_").slice(0, 19);
+    const link = document.createElement("a");
+    link.href = cameraFrameUrl;
+    link.download = `sensor-campus_${timestamp}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   return (
     <main>
       <header className="topbar">
@@ -350,7 +366,7 @@ export default function Dashboard() {
             ><i /></div>
             <div className="last-measurement">
               <time dateTime={lastReading ?? undefined} title={lastReadingDate ? lastReadingDate.toLocaleString("de-DE") : undefined}>{lastReadingText}</time>
-              <small>Letzte Messung</small>
+              <small>{lastReadingDateText} · Letzte Messung</small>
             </div>
           </div>
           <button className="logout-button" type="button" onClick={logout} title="Abmelden" aria-label="Abmelden">
@@ -386,7 +402,23 @@ export default function Dashboard() {
       </nav>
       <div className="monitoring-workspace camera-active">
         <section className={`camera-panel ${cameraActive ? "online" : "offline"}`} id="camera-view" aria-label="Node 2 Livebild">
-          <header><span><i /> Node 2 · {cameraActive ? "Live" : "Offline"}</span></header>
+          <header>
+            <span><i /> Node 2 · {cameraActive ? "Live" : "Offline"}</span>
+            <button
+              className="camera-capture"
+              type="button"
+              disabled={!cameraFrameUrl || cameraError}
+              onClick={captureCameraImage}
+              title="Aktuelles Bild speichern"
+              aria-label="Aktuelles Kamerabild speichern"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" />
+                <circle cx="12" cy="13" r="3.5" />
+              </svg>
+              <b>Bild</b>
+            </button>
+          </header>
           <div className="camera-stage">
             {cameraFrameUrl && !cameraError ? (
               <img
