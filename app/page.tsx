@@ -452,9 +452,16 @@ export default function Dashboard() {
             <button
               type="button"
               disabled={!cameraActive || servoPending || servoAngle <= 0}
+              onClick={() => controlServo(0)}
+            >
+              −180°
+            </button>
+            <button
+              type="button"
+              disabled={!cameraActive || servoPending || servoAngle <= 0}
               onClick={() => controlServo(Math.max(0, servoAngle - 20))}
             >
-              LINKS −20°
+              −20°
             </button>
             <button
               type="button"
@@ -469,7 +476,14 @@ export default function Dashboard() {
               disabled={!cameraActive || servoPending || servoAngle >= 180}
               onClick={() => controlServo(Math.min(180, servoAngle + 20))}
             >
-              RECHTS +20°
+              +20°
+            </button>
+            <button
+              type="button"
+              disabled={!cameraActive || servoPending || servoAngle >= 180}
+              onClick={() => controlServo(180)}
+            >
+              +180°
             </button>
             <small>{servoError ?? (servoPending ? "Kamera wird bewegt …" : `${servoAngle}°`)}</small>
           </div>
@@ -552,7 +566,7 @@ export default function Dashboard() {
         .industrial-button:disabled { opacity: .42; cursor: not-allowed; }
         .industrial-button.stop { background: #287b49; border-color: #175832; }
         .industrial-button.alarm-trigger { background: #c92f2f; border-color: #8e1d1d; }
-        .camera-servo { padding: 9px 12px 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #18232d; border-top: 1px solid #34434e; }
+        .camera-servo { padding: 9px 12px 10px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; background: #18232d; border-top: 1px solid #34434e; }
         .camera-servo button { min-height: 34px; border: 1px solid #526574; border-radius: 6px; color: #dce7ed; background: #293943; font: 800 10px monospace; letter-spacing: .5px; }
         .camera-servo button:hover:not(:disabled) { border-color: #62c99a; background: #315044; }
         .camera-servo button.active { color: #fff; border-color: #31c278; background: #216846; box-shadow: 0 0 0 2px rgba(49,194,120,.12); }
