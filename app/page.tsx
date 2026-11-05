@@ -209,45 +209,34 @@ export default function Dashboard() {
       return;
     }
     let disposed = false;
-    let socket: WebSocket | null = null;
-    let reconnectTimer: number | null = null;
+    let nextFrameTimer: number | null = null;
 
-    const connect = async () => {
+    const loadFrame = async () => {
       try {
-        const response = await fetch("/api/camera/session", { cache: "no-store" });
-        if (!response.ok) throw new Error("Keine Kamera-Sitzung");
-        const session = await response.json() as { url: string };
-        if (disposed) return;
-        socket = new WebSocket(session.url);
-        socket.binaryType = "blob";
-        socket.onopen = () => socket?.send("next");
-        socket.onmessage = (event) => {
-          const nextUrl = URL.createObjectURL(event.data as Blob);
-          const previousUrl = cameraObjectUrl.current;
-          cameraObjectUrl.current = nextUrl;
-          setCameraFrameUrl(nextUrl);
-          setCameraError(false);
-          if (previousUrl) URL.revokeObjectURL(previousUrl);
-          if (socket?.readyState === WebSocket.OPEN) socket.send("next");
-        };
-        socket.onerror = () => socket?.close();
-        socket.onclose = () => {
-          if (!disposed) reconnectTimer = window.setTimeout(connect, 2000);
-        };
-      } catch {
-        if (!disposed) {
-          setCameraError(true);
-          reconnectTimer = window.setTimeout(connect, 2000);
+        const response = await fetch(`/api/camera?t=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error("Kein Kamerabild");
+        const nextUrl = URL.createObjectURL(await response.blob());
+        if (disposed) {
+          URL.revokeObjectURL(nextUrl);
+          return;
         }
+        const previousUrl = cameraObjectUrl.current;
+        cameraObjectUrl.current = nextUrl;
+        setCameraFrameUrl(nextUrl);
+        setCameraError(false);
+        if (previousUrl) URL.revokeObjectURL(previousUrl);
+      } catch {
+        if (!disposed) setCameraError(true);
+      } finally {
+        if (!disposed) nextFrameTimer = window.setTimeout(loadFrame, 750);
       }
     };
 
     setCameraError(false);
-    connect();
+    loadFrame();
     return () => {
       disposed = true;
-      socket?.close();
-      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      if (nextFrameTimer !== null) window.clearTimeout(nextFrameTimer);
       if (cameraObjectUrl.current) URL.revokeObjectURL(cameraObjectUrl.current);
       cameraObjectUrl.current = null;
     };
