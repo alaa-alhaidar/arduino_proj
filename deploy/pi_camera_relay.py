@@ -60,6 +60,26 @@ def ws_authorized(path: str) -> bool:
     return hmac.compare_digest(signature, expected)
 
 
+def servo_command(path: str) -> int | None:
+    parsed = urlsplit(path)
+    if parsed.path != "/servo":
+        return None
+    query = parse_qs(parsed.query)
+    try:
+        angle = int(query.get("angle", [""])[0])
+        expires = int(query.get("expires", [""])[0])
+    except ValueError:
+        return None
+    signature = query.get("signature", [""])[0]
+    now = int(time.time())
+    if angle < 0 or angle > 180 or expires < now or expires > now + 120:
+        return None
+    expected = hmac.new(
+        VIEW_TOKEN.encode(), f"/servo:{angle}:{expires}".encode(), hashlib.sha256
+    ).hexdigest()
+    return angle if hmac.compare_digest(signature, expected) else None
+
+
 def http_response(status: HTTPStatus, body: bytes, content_type: str) -> Response:
     headers = Headers()
     headers["Content-Type"] = content_type
@@ -79,6 +99,15 @@ def websocket_request(_connection: ServerConnection, request: Request) -> Respon
             "frame_age_seconds": round(frame_age, 3) if frame_age is not None else None,
             "websocket_clients": len(ws_clients),
         }).encode()
+        return http_response(HTTPStatus.OK, body, "application/json; charset=utf-8")
+    if parsed.path == "/servo":
+        angle = servo_command(request.path)
+        if angle is None:
+            return http_response(HTTPStatus.UNAUTHORIZED, b'{"error":"Nicht autorisiert"}', "application/json")
+        global servo_angle
+        with servo_lock:
+            servo_angle = angle
+        body = json.dumps({"ok": True, "angle": servo_angle}).encode()
         return http_response(HTTPStatus.OK, body, "application/json; charset=utf-8")
     if parsed.path == "/frame":
         if not authorized(request.headers.get("Authorization"), VIEW_TOKEN):

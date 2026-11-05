@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -22,14 +23,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(new URL("/servo", relayUrl), {
-      method: "POST",
+    const expires = Math.floor(Date.now() / 1000) + 60;
+    const signature = createHmac("sha256", viewToken)
+      .update(`/servo:${angle}:${expires}`)
+      .digest("hex");
+    const servoUrl = new URL("/servo", relayUrl);
+    servoUrl.protocol = servoUrl.protocol === "wss:" ? "https:" : servoUrl.protocol === "ws:" ? "http:" : servoUrl.protocol;
+    servoUrl.searchParams.set("angle", String(angle));
+    servoUrl.searchParams.set("expires", String(expires));
+    servoUrl.searchParams.set("signature", signature);
+    const response = await fetch(servoUrl, {
+      method: "GET",
       cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${viewToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ angle }),
       signal: AbortSignal.timeout(3000),
     });
     const result = await response.json();
