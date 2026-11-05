@@ -30,6 +30,8 @@ WS_PORT = int(os.getenv("CAMERA_WS_PORT", "8767"))
 frame_lock = threading.Lock()
 latest_frame: bytes | None = None
 latest_frame_at = 0.0
+servo_lock = threading.Lock()
+servo_angle = 90
 ws_loop: asyncio.AbstractEventLoop | None = None
 ws_clients: set[ServerConnection] = set()
 ws_ready: set[ServerConnection] = set()
@@ -194,7 +196,31 @@ class CameraRelayHandler(BaseHTTPRequestHandler):
         self.wfile.write(frame)
 
     def do_POST(self) -> None:
-        global latest_frame, latest_frame_at
+        global latest_frame, latest_frame_at, servo_angle
+
+        if self.path == "/servo":
+            if not authorized(self.headers.get("Authorization"), VIEW_TOKEN):
+                self.send_json(401, {"error": "Nicht autorisiert"})
+                return
+            if self.headers.get_content_type() != "application/json":
+                self.send_json(415, {"error": "Content-Type muss application/json sein"})
+                return
+            try:
+                content_length = int(self.headers.get("Content-Length", "0"))
+                if content_length < 2 or content_length > 256:
+                    raise ValueError
+                payload = json.loads(self.rfile.read(content_length))
+                requested_angle = int(payload["angle"])
+            except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+                self.send_json(400, {"error": "Winkel muss eine ganze Zahl sein"})
+                return
+            if requested_angle < 0 or requested_angle > 180:
+                self.send_json(400, {"error": "Winkel muss zwischen 0 und 180 liegen"})
+                return
+            with servo_lock:
+                servo_angle = requested_angle
+            self.send_json(200, {"ok": True, "angle": servo_angle})
+            return
 
         if self.path != "/frame":
             self.send_json(404, {"error": "Nicht gefunden"})
@@ -224,7 +250,13 @@ class CameraRelayHandler(BaseHTTPRequestHandler):
             latest_frame_at = time.monotonic()
         if ws_loop is not None:
             asyncio.run_coroutine_threadsafe(broadcast_frame(frame), ws_loop)
-        self.send_json(202, {"ok": True, "bytes": len(frame)})
+        with servo_lock:
+            current_servo_angle = servo_angle
+        self.send_json(202, {
+            "ok": True,
+            "bytes": len(frame),
+            "servo_angle": current_servo_angle,
+        })
 
 
 def main() -> None:
