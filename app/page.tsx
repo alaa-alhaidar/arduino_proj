@@ -452,9 +452,9 @@ export default function Dashboard() {
             <button
               type="button"
               disabled={!cameraActive || servoPending || servoAngle <= 0}
-              onClick={() => controlServo(Math.max(0, servoAngle - 10))}
+              onClick={() => controlServo(Math.max(0, servoAngle - 20))}
             >
-              LINKS −10°
+              LINKS −20°
             </button>
             <button
               type="button"
@@ -467,9 +467,9 @@ export default function Dashboard() {
             <button
               type="button"
               disabled={!cameraActive || servoPending || servoAngle >= 180}
-              onClick={() => controlServo(Math.min(180, servoAngle + 10))}
+              onClick={() => controlServo(Math.min(180, servoAngle + 20))}
             >
-              RECHTS +10°
+              RECHTS +20°
             </button>
             <small>{servoError ?? (servoPending ? "Kamera wird bewegt …" : `${servoAngle}°`)}</small>
           </div>
