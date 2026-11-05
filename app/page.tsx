@@ -449,21 +449,28 @@ export default function Dashboard() {
             )}
           </div>
           <div className="camera-servo" aria-label="Kamera ausrichten">
-            {[
-              { label: "LINKS", angle: 0 },
-              { label: "MITTE", angle: 90 },
-              { label: "RECHTS", angle: 180 },
-            ].map(({ label, angle }) => (
-              <button
-                key={angle}
-                type="button"
-                disabled={!cameraActive || servoPending}
-                className={servoAngle === angle ? "active" : ""}
-                onClick={() => controlServo(angle)}
-              >
-                {label}
-              </button>
-            ))}
+            <button
+              type="button"
+              disabled={!cameraActive || servoPending || servoAngle <= 0}
+              onClick={() => controlServo(Math.max(0, servoAngle - 10))}
+            >
+              LINKS −10°
+            </button>
+            <button
+              type="button"
+              disabled={!cameraActive || servoPending}
+              className={servoAngle === 90 ? "active" : ""}
+              onClick={() => controlServo(90)}
+            >
+              MITTE
+            </button>
+            <button
+              type="button"
+              disabled={!cameraActive || servoPending || servoAngle >= 180}
+              onClick={() => controlServo(Math.min(180, servoAngle + 10))}
+            >
+              RECHTS +10°
+            </button>
             <small>{servoError ?? (servoPending ? "Kamera wird bewegt …" : `${servoAngle}°`)}</small>
           </div>
         </section>
