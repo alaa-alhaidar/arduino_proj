@@ -459,6 +459,24 @@ export default function Dashboard() {
               </>
             )}
           </div>
+          <div className="camera-servo" aria-label="Kamera ausrichten">
+            {[
+              { label: "LINKS", angle: 0 },
+              { label: "MITTE", angle: 90 },
+              { label: "RECHTS", angle: 180 },
+            ].map(({ label, angle }) => (
+              <button
+                key={angle}
+                type="button"
+                disabled={!cameraActive || servoPending}
+                className={servoAngle === angle ? "active" : ""}
+                onClick={() => controlServo(angle)}
+              >
+                {label}
+              </button>
+            ))}
+            <small>{servoError ?? (servoPending ? "Kamera wird bewegt …" : `${servoAngle}°`)}</small>
+          </div>
         </section>
         <section className="sensor-grid" id="nano-sensors" aria-label="Sensorwerte des Nano">
           {sensors.map((sensor) => <article className={`sensor-card ${sensor.alarm ? "alarm" : ""}`} key={sensor.label}>
@@ -511,32 +529,6 @@ export default function Dashboard() {
           </button>
         </div>
       </section>
-      <section className={`servo-control ${!cameraActive ? "offline" : ""}`} aria-label="Kamera-Servo">
-        <div className="servo-heading">
-          <span>KAMERA-SERVO</span>
-          <strong>{servoPending ? "WIRD BEWEGT …" : `${servoAngle}°`}</strong>
-          {servoError && <small>{servoError}</small>}
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="180"
-          step="1"
-          value={servoAngle}
-          disabled={!cameraActive || servoPending}
-          aria-label="Servowinkel"
-          onChange={(event) => setServoAngle(Number(event.target.value))}
-          onPointerUp={(event) => controlServo(Number(event.currentTarget.value))}
-          onKeyUp={(event) => controlServo(Number(event.currentTarget.value))}
-        />
-        <div className="servo-buttons">
-          {[0, 90, 180].map((angle) => (
-            <button key={angle} type="button" disabled={!cameraActive || servoPending} onClick={() => controlServo(angle)}>
-              {angle}°
-            </button>
-          ))}
-        </div>
-      </section>
       </div>
       <style jsx>{`
         .live.offline { color: #7d8794; background: #edf0f3; }
@@ -546,7 +538,7 @@ export default function Dashboard() {
         .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
         .sensor-card.alarm .meter { background: #f2caca; }
         .sensor-card.alarm .meter span { background: #d93636; }
-        .control-deck { width: min(1120px, calc(100% - 32px)); margin: 18px auto 32px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+        .control-deck { width: min(760px, calc(100% - 32px)); margin: 18px auto 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
         .control-deck :global(.station-control) { width: auto; max-width: none; min-height: 92px; margin: 0; padding: 14px; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); }
         .industrial-control { min-width: 0; margin: 0; padding: 14px; background: #fff; border: 1px solid #cbd5df; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .control-status { min-width: 0; padding: 0; background: transparent; border: 0; color: #253342; }
@@ -564,18 +556,14 @@ export default function Dashboard() {
         .industrial-button:disabled { opacity: .42; cursor: not-allowed; }
         .industrial-button.stop { background: #287b49; border-color: #175832; }
         .industrial-button.alarm-trigger { background: #c92f2f; border-color: #8e1d1d; }
-        .servo-control { min-width: 0; padding: 14px; background: #fff; border: 1px solid #cbd5df; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); display: grid; grid-template-columns: 100px minmax(80px,1fr); align-items: center; gap: 8px 12px; }
-        .servo-heading span { display: block; color: #96a5aa; font: 700 10px monospace; letter-spacing: 1.2px; margin-bottom: 5px; }
-        .servo-heading strong { color: #196d9e; font: 800 14px monospace; }
-        .servo-heading small { display: block; margin-top: 4px; color: #c92f2f; font: 9px/1.25 monospace; }
-        .servo-control input { width: 100%; accent-color: #2389c9; }
-        .servo-buttons { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-        .servo-buttons button { min-height: 30px; border: 1px solid #17668f; border-radius: 5px; color: #fff; background: #2389c9; font: 800 10px monospace; }
-        .servo-buttons button:disabled, .servo-control input:disabled { opacity: .4; cursor: not-allowed; }
-        .servo-control.offline .servo-heading strong { color: #aeb9bd; }
+        .camera-servo { padding: 9px 12px 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #18232d; border-top: 1px solid #34434e; }
+        .camera-servo button { min-height: 34px; border: 1px solid #526574; border-radius: 6px; color: #dce7ed; background: #293943; font: 800 10px monospace; letter-spacing: .5px; }
+        .camera-servo button:hover:not(:disabled) { border-color: #62c99a; background: #315044; }
+        .camera-servo button.active { color: #fff; border-color: #31c278; background: #216846; box-shadow: 0 0 0 2px rgba(49,194,120,.12); }
+        .camera-servo button:disabled { opacity: .4; cursor: not-allowed; }
+        .camera-servo small { grid-column: 1 / -1; color: #91a2ad; text-align: center; font: 9px monospace; }
         .button-symbol { width: 27px; height: 27px; border: 2px solid rgba(255,255,255,.75); display: grid; place-items: center; font-size: 15px; border-radius: 2px; }
-        @media (max-width: 850px) { .control-deck { grid-template-columns: repeat(2, minmax(0, 1fr)); }.servo-control { grid-column: 1 / -1; } }
-        @media (max-width: 650px) { .control-deck { width: calc(100% - 24px); grid-template-columns: 1fr; gap: 12px; margin: 14px auto 20px; }.control-deck :global(.station-control), .industrial-control { min-height: 76px; padding: 10px 12px; align-items: center; flex-direction: row; gap: 8px; }.servo-control { grid-column: auto; padding: 10px 12px; }.control-status { min-width: 108px; padding: 0; }.control-status span { margin-bottom: 4px; font-size: 8px; }.control-status strong { font-size: 10px; }.control-buttons { margin-left: auto; grid-template-columns: repeat(2, 58px); gap: 6px; }.industrial-button { min-height: 32px; padding: 0 6px; }.button-symbol { display: none; } }
+        @media (max-width: 650px) { .control-deck { width: calc(100% - 24px); grid-template-columns: 1fr; gap: 12px; margin: 14px auto 20px; }.control-deck :global(.station-control), .industrial-control { min-height: 76px; padding: 10px 12px; align-items: center; flex-direction: row; gap: 8px; }.control-status { min-width: 108px; padding: 0; }.control-status span { margin-bottom: 4px; font-size: 8px; }.control-status strong { font-size: 10px; }.control-buttons { margin-left: auto; grid-template-columns: repeat(2, 58px); gap: 6px; }.industrial-button { min-height: 32px; padding: 0 6px; }.button-symbol { display: none; } }
       `}</style>
     </main>
   );
