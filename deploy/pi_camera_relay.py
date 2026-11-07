@@ -17,6 +17,8 @@ from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
 
+from pi_fire_detector import FireDetector
+
 
 HOST = os.getenv("CAMERA_RELAY_HOST", "127.0.0.1")
 PORT = int(os.getenv("CAMERA_RELAY_PORT", "8766"))
@@ -35,6 +37,7 @@ servo_angle = 90
 ws_loop: asyncio.AbstractEventLoop | None = None
 ws_clients: set[ServerConnection] = set()
 ws_ready: set[ServerConnection] = set()
+fire_detector = FireDetector()
 
 
 def authorized(header: str | None, expected_token: str) -> bool:
@@ -118,6 +121,11 @@ def websocket_request(_connection: ServerConnection, request: Request) -> Respon
         if frame is None or frame_age > MAX_FRAME_AGE_SECONDS:
             return http_response(HTTPStatus.SERVICE_UNAVAILABLE, b'{"error":"Kein aktuelles Kamerabild"}', "application/json")
         return http_response(HTTPStatus.OK, frame, "image/jpeg")
+    if parsed.path == "/fire/status":
+        if not authorized(request.headers.get("Authorization"), VIEW_TOKEN):
+            return http_response(HTTPStatus.UNAUTHORIZED, b'{"error":"Nicht autorisiert"}', "application/json")
+        body = json.dumps(fire_detector.status()).encode()
+        return http_response(HTTPStatus.OK, body, "application/json; charset=utf-8")
     if not ws_authorized(request.path):
         return http_response(HTTPStatus.UNAUTHORIZED, b"Nicht autorisiert", "text/plain; charset=utf-8")
     return None
@@ -202,6 +210,13 @@ class CameraRelayHandler(BaseHTTPRequestHandler):
             })
             return
 
+        if self.path == "/fire/status":
+            if not authorized(self.headers.get("Authorization"), VIEW_TOKEN):
+                self.send_json(401, {"error": "Nicht autorisiert"})
+                return
+            self.send_json(200, fire_detector.status())
+            return
+
         if self.path != "/frame":
             self.send_json(404, {"error": "Nicht gefunden"})
             return
@@ -277,6 +292,7 @@ class CameraRelayHandler(BaseHTTPRequestHandler):
         with frame_lock:
             latest_frame = frame
             latest_frame_at = time.monotonic()
+        fire_detector.submit(frame)
         if ws_loop is not None:
             asyncio.run_coroutine_threadsafe(broadcast_frame(frame), ws_loop)
         with servo_lock:
@@ -285,10 +301,12 @@ class CameraRelayHandler(BaseHTTPRequestHandler):
             "ok": True,
             "bytes": len(frame),
             "servo_angle": current_servo_angle,
+            "fire": fire_detector.status(),
         })
 
 
 def main() -> None:
+    fire_detector.start()
     threading.Thread(target=start_websocket_server, daemon=True).start()
     server = ThreadingHTTPServer((HOST, PORT), CameraRelayHandler)
     print(f"Kamera-Relay hört auf http://{HOST}:{PORT}", flush=True)

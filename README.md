@@ -124,7 +124,36 @@ CAMERA_RELAY_HOST=127.0.0.1
 CAMERA_RELAY_PORT=8766
 CAMERA_WS_HOST=127.0.0.1
 CAMERA_WS_PORT=8767
+
+# Lokale Feuererkennung (optional; ohne FIRE_MODEL_PATH bleibt sie deaktiviert)
+FIRE_MODEL_PATH=/home/alaa/pi-control/models/fire-best.pt
+FIRE_LABELS=fire,flame
+FIRE_CONFIDENCE=0.60
+FIRE_IMAGE_SIZE=320
+FIRE_INFERENCE_INTERVAL_SECONDS=1.0
+FIRE_WINDOW_SIZE=5
+FIRE_MIN_POSITIVES=3
 ```
+
+Das Modell muss ein Ultralytics-YOLO-Detektions- oder Klassifikationsmodell sein,
+dessen Klassenbezeichnungen zu `FIRE_LABELS` passen. Die Inferenz läuft in
+einem Hintergrund-Thread und verarbeitet höchstens den neuesten Frame. Ein
+Alarm wird erst aktiv, wenn mindestens `FIRE_MIN_POSITIVES` der letzten
+`FIRE_WINDOW_SIZE` Auswertungen positiv waren. Der aktuelle Zustand ist mit dem
+Viewer-Token über `GET /fire/status` abrufbar.
+
+Installation im virtuellen Environment des Kamera-Relays:
+
+```bash
+/home/alaa/pi-alarm/venv/bin/pip install -r /home/alaa/pi-control/requirements-camera-relay.txt
+sh /home/alaa/pi-control/install_fire_model.sh
+systemctl --user restart pi-camera-relay.service
+```
+
+Das Installationsskript lädt ein offenes YOLOv8n-Modell für Feuer und Rauch
+aus einem festgelegten Commit, prüft seine SHA-256-Prüfsumme und installiert es
+unter dem in `FIRE_MODEL_PATH` verwendeten Pfad. Herkunft und Lizenz stehen in
+`deploy/THIRD_PARTY_MODELS.md`.
 
 Die öffentliche PWA benötigt `CAMERA_RELAY_URL` und dasselbe
 `CAMERA_VIEW_TOKEN`. Port 8767 wird über einen HTTPS-/WebSocket-Tunnel oder

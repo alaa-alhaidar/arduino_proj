@@ -14,6 +14,7 @@ type Range = { min: number; max: number };
 type Ranges = Record<keyof Measurements, Range>;
 type ChartPoint = { value: number; receivedAt: number };
 type IoTDevice = { ip: string; name: string; hostname: string; online: boolean; lastChecked: string };
+type FireStatus = { alarm: boolean; confidence: number; positives: number; window_size: number };
 const CHART_WINDOW_MS = 10 * 60_000;
 const SENSOR_POLL_MS = 10_000;
 
@@ -95,7 +96,9 @@ export default function Dashboard() {
   const [servoAngle, setServoAngle] = useState(90);
   const [servoPending, setServoPending] = useState(false);
   const [servoError, setServoError] = useState<string | null>(null);
+  const [fireAlert, setFireAlert] = useState<FireStatus | null>(null);
   const cameraObjectUrl = useRef<string | null>(null);
+  const fireAlertDismissed = useRef(false);
   const cameraOnline = devices.some((device) =>
     device.online && /cam|kamera/i.test(`${device.name} ${device.hostname}`));
   const cameraActive = cameraOnline && stationRunning !== false;
@@ -142,6 +145,31 @@ export default function Dashboard() {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let disposed = false;
+    async function loadFireStatus() {
+      try {
+        const response = await fetch(`/api/camera/fire?t=${Date.now()}`, { cache: "no-store" });
+        const status = await response.json() as FireStatus;
+        if (!response.ok || disposed) return;
+        if (!status.alarm) {
+          fireAlertDismissed.current = false;
+          setFireAlert(null);
+        } else if (!fireAlertDismissed.current) {
+          setFireAlert(status);
+        }
+      } catch {
+        // Kamera- oder Tunnelstörungen dürfen keinen Feueralarm vortäuschen.
+      }
+    }
+    loadFireStatus();
+    const timer = window.setInterval(loadFireStatus, 1000);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -362,6 +390,23 @@ export default function Dashboard() {
 
   return (
     <main>
+      {fireAlert && (
+        <div className="fire-alert-backdrop" role="presentation">
+          <section className="fire-alert" role="alertdialog" aria-modal="true" aria-labelledby="fire-alert-title" aria-describedby="fire-alert-description">
+            <div className="fire-alert-icon" aria-hidden="true">🔥</div>
+            <p>KI-FEUERERKENNUNG</p>
+            <h2 id="fire-alert-title">Feuer erkannt!</h2>
+            <span id="fire-alert-description">
+              Die Kamera-KI hat Feuer in {fireAlert.positives} von {fireAlert.window_size} Prüfungen erkannt.
+              Bitte Livebild kontrollieren und bei Gefahr sofort reagieren.
+            </span>
+            <button type="button" autoFocus onClick={() => {
+              fireAlertDismissed.current = true;
+              setFireAlert(null);
+            }}>Alarm bestätigen</button>
+          </section>
+        </div>
+      )}
       <header className="topbar">
         <div className="brand"><div className="brandmark"><span /><span /><span /></div><strong>Sensor Campus</strong></div>
         <div className="top-actions">
@@ -543,6 +588,14 @@ export default function Dashboard() {
       <style jsx>{`
         .live.offline { color: #7d8794; background: #edf0f3; }
         .live.offline i { background: #9aa3ad; box-shadow: none; }
+        .fire-alert-backdrop { position: fixed; inset: 0; z-index: 1000; padding: 20px; display: grid; place-items: center; background: rgba(25, 8, 8, .72); backdrop-filter: blur(4px); }
+        .fire-alert { width: min(440px, 100%); padding: 28px; border: 3px solid #ff5a4f; border-radius: 18px; color: #fff; background: #981f1f; box-shadow: 0 24px 70px rgba(0,0,0,.45); text-align: center; }
+        .fire-alert-icon { font-size: 52px; line-height: 1; }
+        .fire-alert p { margin: 16px 0 7px; color: #ffd1cd; font: 800 11px monospace; letter-spacing: 1.6px; }
+        .fire-alert h2 { margin: 0; font: 800 30px Manrope,sans-serif; }
+        .fire-alert span { display: block; margin: 14px 0 22px; color: #ffe9e7; font-size: 14px; line-height: 1.55; }
+        .fire-alert button { width: 100%; min-height: 46px; border: 0; border-radius: 9px; color: #801717; background: #fff; font-weight: 800; }
+        .fire-alert button:focus-visible { outline: 4px solid #ffd45c; outline-offset: 3px; }
         .sensor-card.alarm { background: #ffd9d9; border: 2px solid #dc2626; box-shadow: 0 4px 20px rgba(190, 34, 34, .24); }
         .sensor-card.alarm .sensor-icon { color: #fff; background: #d93636; }
         .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
