@@ -37,6 +37,7 @@ servo_angle = 90
 ws_loop: asyncio.AbstractEventLoop | None = None
 ws_clients: set[ServerConnection] = set()
 ws_ready: set[ServerConnection] = set()
+fire_ws_clients: set[ServerConnection] = set()
 fire_detector = FireDetector()
 
 
@@ -55,10 +56,10 @@ def ws_authorized(path: str) -> bool:
         return False
     signature = query.get("signature", [""])[0]
     now = int(time.time())
-    if parsed.path != "/ws" or expires < now or expires > now + 120:
+    if parsed.path not in {"/ws", "/fire/ws"} or expires < now or expires > now + 120:
         return False
     expected = hmac.new(
-        VIEW_TOKEN.encode(), f"/ws:{expires}".encode(), hashlib.sha256
+        VIEW_TOKEN.encode(), f"{parsed.path}:{expires}".encode(), hashlib.sha256
     ).hexdigest()
     return hmac.compare_digest(signature, expected)
 
@@ -132,6 +133,16 @@ def websocket_request(_connection: ServerConnection, request: Request) -> Respon
 
 
 async def websocket_handler(connection: ServerConnection) -> None:
+    if urlsplit(connection.request.path).path == "/fire/ws":
+        fire_ws_clients.add(connection)
+        try:
+            await connection.send(json.dumps(fire_detector.status()))
+            async for _message in connection:
+                pass
+        finally:
+            fire_ws_clients.discard(connection)
+        return
+
     ws_clients.add(connection)
     try:
         with frame_lock:
@@ -165,6 +176,26 @@ async def broadcast_frame(frame: bytes) -> None:
             ws_ready.discard(client)
 
 
+async def broadcast_fire_status() -> None:
+    last_processed = -1
+    while True:
+        status = fire_detector.status()
+        processed = int(status["frames_processed"])
+        if processed != last_processed:
+            last_processed = processed
+            clients = tuple(fire_ws_clients)
+            if clients:
+                message = json.dumps(status)
+                results = await asyncio.gather(
+                    *(client.send(message) for client in clients),
+                    return_exceptions=True,
+                )
+                for client, result in zip(clients, results):
+                    if isinstance(result, Exception):
+                        fire_ws_clients.discard(client)
+        await asyncio.sleep(0.25)
+
+
 async def run_websocket_server() -> None:
     global ws_loop
     ws_loop = asyncio.get_running_loop()
@@ -177,7 +208,12 @@ async def run_websocket_server() -> None:
         max_size=MAX_FRAME_BYTES,
     ):
         print(f"Kamera-WebSocket hört auf ws://{WS_HOST}:{WS_PORT}/ws", flush=True)
-        await asyncio.Future()
+        status_task = asyncio.create_task(broadcast_fire_status())
+        try:
+            await asyncio.Future()
+        finally:
+            status_task.cancel()
+            await asyncio.gather(status_task, return_exceptions=True)
 
 
 def start_websocket_server() -> None:

@@ -149,26 +149,38 @@ export default function Dashboard() {
 
   useEffect(() => {
     let disposed = false;
-    async function loadFireStatus() {
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+
+    async function connectFireStatus() {
       try {
-        const response = await fetch(`/api/camera/fire?t=${Date.now()}`, { cache: "no-store" });
-        const status = await response.json() as FireStatus;
-        if (!response.ok || disposed) return;
-        if (!status.alarm) {
-          fireAlertDismissed.current = false;
-          setFireAlert(null);
-        } else if (!fireAlertDismissed.current) {
-          setFireAlert(status);
-        }
+        const response = await fetch("/api/camera/fire/session", { cache: "no-store" });
+        const session = await response.json() as { url?: string };
+        if (!response.ok || !session.url || disposed) throw new Error("Feuerstatus nicht erreichbar");
+        socket = new WebSocket(session.url);
+        socket.onmessage = (event) => {
+          if (disposed || typeof event.data !== "string") return;
+          const status = JSON.parse(event.data) as FireStatus;
+          if (!status.alarm) {
+            fireAlertDismissed.current = false;
+            setFireAlert(null);
+          } else if (!fireAlertDismissed.current) {
+            setFireAlert(status);
+          }
+        };
+        socket.onerror = () => socket?.close();
+        socket.onclose = () => {
+          if (!disposed) reconnectTimer = window.setTimeout(connectFireStatus, 2000);
+        };
       } catch {
-        // Kamera- oder Tunnelstörungen dürfen keinen Feueralarm vortäuschen.
+        if (!disposed) reconnectTimer = window.setTimeout(connectFireStatus, 2000);
       }
     }
-    loadFireStatus();
-    const timer = window.setInterval(loadFireStatus, 1000);
+    connectFireStatus();
     return () => {
       disposed = true;
-      window.clearInterval(timer);
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      socket?.close();
     };
   }, []);
 
