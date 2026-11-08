@@ -169,6 +169,21 @@ def write_tolerance_state():
         temporary.replace(TOLERANCE_FILE)
 
 
+def set_hardware_mute(muted):
+    global hardware_muted
+    hardware_muted = muted
+    if muted:
+        ALARM_MUTE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temporary = ALARM_MUTE_FILE.with_suffix(".tmp")
+        temporary.write_text(json.dumps({
+            "muted": True,
+            "alarm_signature": alarm_signature(),
+        }), encoding="utf-8")
+        temporary.replace(ALARM_MUTE_FILE)
+    else:
+        ALARM_MUTE_FILE.unlink(missing_ok=True)
+
+
 def update_alarm_output():
     global alarm_signalling, alarm_output_mode
     with status_lock:
@@ -431,8 +446,11 @@ def on_message(client, userdata, message):
             manual_alarm_continuous = enabled and command.get("mode") == "continuous"
             if enabled:
                 automatic_alarm_acknowledged = False
+                set_hardware_mute(False)
             elif automatic_alarm_active:
                 automatic_alarm_acknowledged = True
+            if not enabled and command.get("mute_all") is True:
+                set_hardware_mute(True)
         update_alarm_output()
         write_tolerance_state()
         write_state(enabled)

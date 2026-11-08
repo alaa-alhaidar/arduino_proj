@@ -324,8 +324,8 @@ export default function Dashboard() {
     { tone: "green", label: "Luftqualität", value: measurements ? formatNumber(measurements.gas_resistance_ohm / 1000) : "—", unit: "kΩ", data: visibleHistory.map((point) => ({ value: point.gas_resistance_ohm / 1000, receivedAt: point.receivedAt })), limits: ranges?.gas_resistance_ohm ? { min: ranges.gas_resistance_ohm.min / 1000, max: ranges.gas_resistance_ohm.max / 1000 } : undefined, alarm: outsideRange(measurements?.gas_resistance_ohm, ranges?.gas_resistance_ohm) },
   ];
 
-  async function controlPi(enabled: boolean) {
-    if (stationRunning !== true || pendingAlarm !== null) return;
+  async function controlPi(enabled: boolean): Promise<boolean> {
+    if (stationRunning !== true || pendingAlarm !== null) return false;
     setPendingAlarm(enabled ? "on" : "off");
     setControlError(null);
     try {
@@ -338,8 +338,10 @@ export default function Dashboard() {
       if (!response.ok) throw new Error(result.error ?? "Schaltbefehl fehlgeschlagen");
       setAlarmOn(enabled);
       setAlarmAcknowledged(!enabled && automaticAlarm);
+      return true;
     } catch (error) {
       setControlError(error instanceof Error ? error.message : "Schaltbefehl fehlgeschlagen");
+      return false;
     } finally {
       setPendingAlarm(null);
     }
@@ -395,12 +397,15 @@ export default function Dashboard() {
     link.remove();
   }
 
-  function acknowledgeFireAlarm() {
-    const socket = fireStatusSocket.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN || fireAckPendingRef.current) return;
+  async function acknowledgeFireAlarm() {
+    if (fireAckPendingRef.current) return;
     fireAckPendingRef.current = true;
     setFireAckPending(true);
-    socket.send("acknowledge");
+    const confirmed = await controlPi(false);
+    if (!confirmed) {
+      fireAckPendingRef.current = false;
+      setFireAckPending(false);
+    }
   }
 
   async function controlServo(angle: number) {
@@ -436,7 +441,7 @@ export default function Dashboard() {
               Bitte Livebild kontrollieren und bei Gefahr sofort reagieren.
             </span>
             <button type="button" autoFocus disabled={fireAckPending} onClick={acknowledgeFireAlarm}>
-              {fireAckPending ? "Wird bestätigt …" : "Alarm bestätigen"}
+              {fireAckPending ? "Wird ausgeschaltet …" : "AUS – Alarm bestätigen"}
             </button>
           </section>
         </div>

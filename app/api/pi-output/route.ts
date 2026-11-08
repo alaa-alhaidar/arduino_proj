@@ -56,9 +56,22 @@ export async function POST(request: Request) {
       });
     });
 
+    if (!enabled) {
+      await connectedClient.publishAsync(
+        topic,
+        JSON.stringify({
+          enabled: false,
+          mode: "continuous",
+          source: "fire-ai",
+          request_id: `${requestId}-fire`,
+        }),
+        { qos: 1, retain: true },
+      );
+    }
+
     await connectedClient.publishAsync(
       topic,
-      JSON.stringify({ enabled, request_id: requestId }),
+      JSON.stringify({ enabled, mute_all: !enabled, request_id: requestId }),
       { qos: 1, retain: false },
     );
     await confirmation;
