@@ -11,8 +11,10 @@ import threading
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+import paho.mqtt.client as mqtt
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
@@ -28,6 +30,14 @@ MAX_FRAME_BYTES = int(os.getenv("CAMERA_MAX_FRAME_BYTES", "524288"))
 MAX_FRAME_AGE_SECONDS = float(os.getenv("CAMERA_MAX_FRAME_AGE_SECONDS", "10"))
 WS_HOST = os.getenv("CAMERA_WS_HOST", "127.0.0.1")
 WS_PORT = int(os.getenv("CAMERA_WS_PORT", "8767"))
+FIRE_ALARM_STATE_FILE = Path(os.getenv(
+    "FIRE_ALARM_STATE_FILE", "/home/alaa/pi-control/fire-alarm.json"
+))
+MQTT_HOST = os.getenv("MQTT_HOST", "jfa0c01f.ala.eu-central-1.emqxsl.com")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "8883"))
+MQTT_ALARM_TOPIC = os.getenv(
+    "MQTT_ALARM_TOPIC", "htw/alaa/iot2026/nano-01/commands/alarm"
+)
 
 frame_lock = threading.Lock()
 latest_frame: bytes | None = None
@@ -39,6 +49,73 @@ ws_clients: set[ServerConnection] = set()
 ws_ready: set[ServerConnection] = set()
 fire_ws_clients: set[ServerConnection] = set()
 fire_detector = FireDetector()
+
+
+def load_fire_alarm() -> bool:
+    try:
+        return json.loads(FIRE_ALARM_STATE_FILE.read_text(encoding="utf-8")).get("latched") is True
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
+fire_alarm_lock = threading.Lock()
+fire_alarm_latched = load_fire_alarm()
+
+
+class FireAlarmPublisher:
+    def __init__(self) -> None:
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        if MQTT_PORT == 8883:
+            self.client.tls_set(ca_certs=os.getenv(
+                "MQTT_CA_FILE", "/etc/ssl/certs/ca-certificates.crt"
+            ))
+        if os.getenv("MQTT_USERNAME"):
+            self.client.username_pw_set(
+                os.environ["MQTT_USERNAME"], os.getenv("MQTT_PASSWORD")
+            )
+        self.client.on_connect = self._on_connect
+
+    def _on_connect(self, client, _userdata, _flags, reason_code, _properties) -> None:
+        if reason_code == 0:
+            self.publish(fire_alarm_latched)
+
+    def start(self) -> None:
+        self.client.connect_async(MQTT_HOST, MQTT_PORT, 30)
+        self.client.loop_start()
+
+    def publish(self, enabled: bool) -> None:
+        self.client.publish(
+            MQTT_ALARM_TOPIC,
+            json.dumps({
+                "enabled": enabled,
+                "mode": "continuous",
+                "source": "fire-ai",
+                "request_id": "fire-ai",
+            }),
+            qos=1,
+            retain=True,
+        )
+
+
+fire_alarm_publisher = FireAlarmPublisher()
+
+
+def set_fire_alarm(enabled: bool) -> None:
+    global fire_alarm_latched
+    with fire_alarm_lock:
+        fire_alarm_latched = enabled
+        FIRE_ALARM_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temporary = FIRE_ALARM_STATE_FILE.with_suffix(".tmp")
+        temporary.write_text(json.dumps({"latched": enabled}), encoding="utf-8")
+        temporary.replace(FIRE_ALARM_STATE_FILE)
+    fire_alarm_publisher.publish(enabled)
+
+
+def fire_status() -> dict[str, object]:
+    status = fire_detector.status()
+    with fire_alarm_lock:
+        status["latched_alarm"] = fire_alarm_latched
+    return status
 
 
 def authorized(header: str | None, expected_token: str) -> bool:
@@ -125,7 +202,7 @@ def websocket_request(_connection: ServerConnection, request: Request) -> Respon
     if parsed.path == "/fire/status":
         if not authorized(request.headers.get("Authorization"), VIEW_TOKEN):
             return http_response(HTTPStatus.UNAUTHORIZED, b'{"error":"Nicht autorisiert"}', "application/json")
-        body = json.dumps(fire_detector.status()).encode()
+        body = json.dumps(fire_status()).encode()
         return http_response(HTTPStatus.OK, body, "application/json; charset=utf-8")
     if not ws_authorized(request.path):
         return http_response(HTTPStatus.UNAUTHORIZED, b"Nicht autorisiert", "text/plain; charset=utf-8")
@@ -136,9 +213,11 @@ async def websocket_handler(connection: ServerConnection) -> None:
     if urlsplit(connection.request.path).path == "/fire/ws":
         fire_ws_clients.add(connection)
         try:
-            await connection.send(json.dumps(fire_detector.status()))
-            async for _message in connection:
-                pass
+            await connection.send(json.dumps(fire_status()))
+            async for message in connection:
+                if message == "acknowledge":
+                    set_fire_alarm(False)
+                    await connection.send(json.dumps(fire_status()))
         finally:
             fire_ws_clients.discard(connection)
         return
@@ -179,10 +258,17 @@ async def broadcast_frame(frame: bytes) -> None:
 async def broadcast_fire_status() -> None:
     last_processed = -1
     while True:
-        status = fire_detector.status()
+        status = fire_status()
         processed = int(status["frames_processed"])
         if processed != last_processed:
             last_processed = processed
+            if status["alarm"] is True and status["latched_alarm"] is False:
+                set_fire_alarm(True)
+                status = fire_status()
+            elif status["latched_alarm"] is True:
+                # Erneut senden, falls ein fremder manueller AUS-Befehl den
+                # verriegelten Feueralarm vorübergehend überschrieben hat.
+                fire_alarm_publisher.publish(True)
             clients = tuple(fire_ws_clients)
             if clients:
                 message = json.dumps(status)
@@ -250,7 +336,7 @@ class CameraRelayHandler(BaseHTTPRequestHandler):
             if not authorized(self.headers.get("Authorization"), VIEW_TOKEN):
                 self.send_json(401, {"error": "Nicht autorisiert"})
                 return
-            self.send_json(200, fire_detector.status())
+            self.send_json(200, fire_status())
             return
 
         if self.path != "/frame":
@@ -337,12 +423,13 @@ class CameraRelayHandler(BaseHTTPRequestHandler):
             "ok": True,
             "bytes": len(frame),
             "servo_angle": current_servo_angle,
-            "fire": fire_detector.status(),
+            "fire": fire_status(),
         })
 
 
 def main() -> None:
     fire_detector.start()
+    fire_alarm_publisher.start()
     threading.Thread(target=start_websocket_server, daemon=True).start()
     server = ThreadingHTTPServer((HOST, PORT), CameraRelayHandler)
     print(f"Kamera-Relay hört auf http://{HOST}:{PORT}", flush=True)

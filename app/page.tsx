@@ -14,7 +14,7 @@ type Range = { min: number; max: number };
 type Ranges = Record<keyof Measurements, Range>;
 type ChartPoint = { value: number; receivedAt: number };
 type IoTDevice = { ip: string; name: string; hostname: string; online: boolean; lastChecked: string };
-type FireStatus = { alarm: boolean; confidence: number; positives: number; window_size: number };
+type FireStatus = { alarm: boolean; latched_alarm: boolean; confidence: number; positives: number; window_size: number };
 const CHART_WINDOW_MS = 10 * 60_000;
 const SENSOR_POLL_MS = 10_000;
 
@@ -97,7 +97,10 @@ export default function Dashboard() {
   const [servoPending, setServoPending] = useState(false);
   const [servoError, setServoError] = useState<string | null>(null);
   const [fireAlert, setFireAlert] = useState<FireStatus | null>(null);
+  const [fireAckPending, setFireAckPending] = useState(false);
   const cameraObjectUrl = useRef<string | null>(null);
+  const fireStatusSocket = useRef<WebSocket | null>(null);
+  const fireAckPendingRef = useRef(false);
   const fireAlertDismissed = useRef(false);
   const cameraOnline = devices.some((device) =>
     device.online && /cam|kamera/i.test(`${device.name} ${device.hostname}`));
@@ -158,20 +161,29 @@ export default function Dashboard() {
         const session = await response.json() as { url?: string };
         if (!response.ok || !session.url || disposed) throw new Error("Feuerstatus nicht erreichbar");
         socket = new WebSocket(session.url);
+        fireStatusSocket.current = socket;
         socket.onmessage = (event) => {
           if (disposed || typeof event.data !== "string") return;
           const status = JSON.parse(event.data) as FireStatus;
-          if (!status.alarm) {
+          if (!status.latched_alarm) {
             // Ein bereits sichtbarer Alarm bleibt bis zur manuellen Bestätigung
             // geöffnet. Der inaktive Status schaltet nur die nächste
             // Alarmepisode wieder frei.
             fireAlertDismissed.current = false;
+            if (fireAckPendingRef.current) {
+              fireAckPendingRef.current = false;
+              setFireAckPending(false);
+              setFireAlert(null);
+            }
           } else if (!fireAlertDismissed.current) {
             setFireAlert(status);
           }
         };
         socket.onerror = () => socket?.close();
         socket.onclose = () => {
+          if (fireStatusSocket.current === socket) fireStatusSocket.current = null;
+          fireAckPendingRef.current = false;
+          setFireAckPending(false);
           if (!disposed) reconnectTimer = window.setTimeout(connectFireStatus, 2000);
         };
       } catch {
@@ -183,6 +195,7 @@ export default function Dashboard() {
       disposed = true;
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       socket?.close();
+      fireStatusSocket.current = null;
     };
   }, []);
 
@@ -382,6 +395,14 @@ export default function Dashboard() {
     link.remove();
   }
 
+  function acknowledgeFireAlarm() {
+    const socket = fireStatusSocket.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN || fireAckPendingRef.current) return;
+    fireAckPendingRef.current = true;
+    setFireAckPending(true);
+    socket.send("acknowledge");
+  }
+
   async function controlServo(angle: number) {
     if (!cameraActive || servoPending) return;
     setServoPending(true);
@@ -414,10 +435,9 @@ export default function Dashboard() {
               Die Kamera-KI hat Feuer in {fireAlert.positives} von {fireAlert.window_size} Prüfungen erkannt.
               Bitte Livebild kontrollieren und bei Gefahr sofort reagieren.
             </span>
-            <button type="button" autoFocus onClick={() => {
-              fireAlertDismissed.current = true;
-              setFireAlert(null);
-            }}>Alarm bestätigen</button>
+            <button type="button" autoFocus disabled={fireAckPending} onClick={acknowledgeFireAlarm}>
+              {fireAckPending ? "Wird bestätigt …" : "Alarm bestätigen"}
+            </button>
           </section>
         </div>
       )}

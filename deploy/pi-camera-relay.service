@@ -6,6 +6,7 @@ After=network-online.target
 Type=simple
 ExecStart=/home/alaa/pi-alarm/venv/bin/python /home/alaa/pi-control/pi_camera_relay.py
 EnvironmentFile=/home/alaa/.config/sensor-campus/camera.env
+EnvironmentFile=/home/alaa/.config/sensor-campus/control.env
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
