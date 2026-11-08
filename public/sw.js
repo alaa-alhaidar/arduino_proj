@@ -1,4 +1,4 @@
-const CACHE = "sensor-campus-v15";
+const CACHE = "sensor-campus-v16";
 const SHELL = ["/login", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

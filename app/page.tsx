@@ -464,14 +464,10 @@ export default function Dashboard() {
     <main>
       {fireAlert && (
         <div className="fire-alert-backdrop" role="presentation">
-          <section className="fire-alert" role="alertdialog" aria-modal="true" aria-labelledby="fire-alert-title" aria-describedby="fire-alert-description">
+          <section className="fire-alert" role="alertdialog" aria-modal="true" aria-labelledby="fire-alert-title">
             <div className="fire-alert-icon" aria-hidden="true">🔥</div>
             <p>KI-FEUERERKENNUNG</p>
             <h2 id="fire-alert-title">Feuer erkannt!</h2>
-            <span id="fire-alert-description">
-              Die Kamera-KI hat ein bestätigtes Feuerereignis erkannt.
-              Bitte Livebild und Umgebung kontrollieren und bei Gefahr sofort reagieren.
-            </span>
             <div className="fire-alert-actions">
               <button className="fire-silence" type="button" disabled={fireAckPending || !fireAlert.latched_alarm} onClick={silenceFireAlarm}>
                 {fireAlert.latched_alarm ? "Buzzer AUS" : "Buzzer ist aus"}
@@ -669,8 +665,7 @@ export default function Dashboard() {
         .fire-alert-icon { font-size: 52px; line-height: 1; }
         .fire-alert p { margin: 16px 0 7px; color: #ffd1cd; font: 800 11px monospace; letter-spacing: 1.6px; }
         .fire-alert h2 { margin: 0; font: 800 30px Manrope,sans-serif; }
-        .fire-alert span { display: block; margin: 14px 0 22px; color: #ffe9e7; font-size: 14px; line-height: 1.55; }
-        .fire-alert-actions { display: grid; grid-template-columns: 1fr 1.35fr; gap: 10px; }
+        .fire-alert-actions { margin-top: 22px; display: grid; grid-template-columns: 1fr 1.35fr; gap: 10px; }
         .fire-alert button { width: 100%; min-height: 46px; border: 0; border-radius: 9px; color: #801717; background: #fff; font-weight: 800; }
         .fire-alert button.fire-silence { color: #fff; background: #621010; border: 1px solid #e47770; }
         .fire-alert button:disabled { opacity: .58; cursor: not-allowed; }
