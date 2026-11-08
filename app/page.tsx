@@ -718,12 +718,12 @@ export default function Dashboard() {
         .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
         .sensor-card.alarm .meter { background: #f2caca; }
         .sensor-card.alarm .meter span { background: #d93636; }
-        .system-log { grid-column: 1 / -1; min-width: 0; overflow: hidden; border: 1px solid #dbe3eb; border-radius: 13px; background: #fff; box-shadow: 0 4px 16px rgba(21,54,88,.04); }
+        .system-log { grid-column: 1 / -1; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #dbe3eb; border-radius: 13px; background: #fff; box-shadow: 0 4px 16px rgba(21,54,88,.04); }
         .system-log > header { min-height: 52px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e3e9ef; background: #f8fafc; }
         .system-log > header div { display: flex; flex-direction: column; gap: 3px; }
         .system-log > header strong { color: #22384e; font: 800 11px monospace; letter-spacing: 1px; }
         .system-log > header small, .system-log > header span { color: #7c8997; font-size: 9px; }
-        .system-log-scroll { max-height: 230px; overflow: auto; }
+        .system-log-scroll { min-height: 0; flex: 1; overflow: auto; }
         .system-log table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; }
         .system-log th { position: sticky; top: 0; z-index: 1; padding: 8px 10px; color: #637386; background: #eef3f7; font: 700 9px monospace; letter-spacing: .5px; }
         .system-log td { padding: 8px 10px; border-top: 1px solid #edf1f4; color: #34475a; vertical-align: middle; }
@@ -733,7 +733,8 @@ export default function Dashboard() {
         .event-source.sensor { color: #256f58; background: #e5f6ef; }.event-source.fire { color: #a52720; background: #ffe6e2; }.event-source.dos { color: #6544a0; background: #eee8fb; }
         .event-severity.info { color: #315c83; background: #e8f1f8; }.event-severity.warning { color: #805f00; background: #fff1bd; }.event-severity.critical { color: #a21f1f; background: #ffdede; }
         .system-log-empty { height: 70px; text-align: center; color: #8a96a3!important; }
-        @media (max-width: 650px) { .system-log-scroll { max-height: 260px; }.system-log td:first-child { width: auto; }.system-log th,.system-log td { padding: 7px 6px; }.system-log > header small { display: none; } }
+        @media (max-width: 950px) { .system-log-scroll { max-height: 260px; } }
+        @media (max-width: 650px) { .system-log td:first-child { width: auto; }.system-log th,.system-log td { padding: 7px 6px; }.system-log > header small { display: none; } }
         .control-deck { width: min(760px, calc(100% - 32px)); margin: 18px auto 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
         .control-deck :global(.station-control) { width: auto; max-width: none; min-height: 92px; margin: 0; padding: 14px; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); }
         .industrial-control { min-width: 0; margin: 0; padding: 14px; background: #fff; border: 1px solid #cbd5df; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
