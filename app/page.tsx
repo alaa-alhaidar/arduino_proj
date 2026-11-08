@@ -102,8 +102,6 @@ export default function Dashboard() {
   const cameraObjectUrl = useRef<string | null>(null);
   const fireStatusSocket = useRef<WebSocket | null>(null);
   const fireAckPendingRef = useRef(false);
-  const closeFireAfterSilence = useRef(false);
-  const fireConfirmationSent = useRef(false);
   const fireAlertDismissed = useRef(false);
   const cameraOnline = devices.some((device) =>
     device.online && /cam|kamera/i.test(`${device.name} ${device.hostname}`));
@@ -178,31 +176,22 @@ export default function Dashboard() {
           if (disposed || typeof event.data !== "string") return;
           const status = JSON.parse(event.data) as FireStatus;
           if (status.notification_active === false) {
-            const confirmedByUser = fireAckPendingRef.current && closeFireAfterSilence.current;
-            if (confirmedByUser) {
-              fireAlertDismissed.current = true;
-              window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
-              setFireAlert(null);
-            } else {
-              setFireAlert((current) => current ? { ...current, latched_alarm: false } : current);
-            }
+            // Nach der serverseitigen Bestätigung darf ein späteres neues
+            // Feuerereignis wieder ein Fenster öffnen.
+            fireAlertDismissed.current = false;
+            setFireAlert((current) => current ? { ...current, latched_alarm: false } : current);
             if (fireAckPendingRef.current) {
               fireAckPendingRef.current = false;
-              closeFireAfterSilence.current = false;
-              fireConfirmationSent.current = false;
               setFireAckPending(false);
             }
           } else if (status.notification_active === true) {
-            window.localStorage.setItem(FIRE_ALERT_STORAGE_KEY, JSON.stringify(status));
-            setFireAlert(status);
+            if (!fireAlertDismissed.current) {
+              window.localStorage.setItem(FIRE_ALERT_STORAGE_KEY, JSON.stringify(status));
+              setFireAlert(status);
+            }
             if (fireAckPendingRef.current && !status.latched_alarm) {
-              if (closeFireAfterSilence.current && !fireConfirmationSent.current) {
-                fireConfirmationSent.current = true;
-                socket?.send("confirm");
-              } else if (!closeFireAfterSilence.current) {
-                fireAckPendingRef.current = false;
-                setFireAckPending(false);
-              }
+              fireAckPendingRef.current = false;
+              setFireAckPending(false);
             }
           }
         };
@@ -210,8 +199,6 @@ export default function Dashboard() {
         socket.onclose = () => {
           if (fireStatusSocket.current === socket) fireStatusSocket.current = null;
           fireAckPendingRef.current = false;
-          closeFireAfterSilence.current = false;
-          fireConfirmationSent.current = false;
           setFireAckPending(false);
           if (!disposed) reconnectTimer = window.setTimeout(connectFireStatus, 2000);
         };
@@ -426,30 +413,26 @@ export default function Dashboard() {
     link.remove();
   }
 
-  async function silenceFireAlarm(closeAfter: boolean) {
+  async function silenceFireAlarm() {
     if (fireAckPendingRef.current) return;
-    if (fireAlert?.latched_alarm === false) {
-      if (closeAfter) {
-        fireAckPendingRef.current = true;
-        closeFireAfterSilence.current = true;
-        setFireAckPending(true);
-        const socket = fireStatusSocket.current;
-        fireConfirmationSent.current = socket?.readyState === WebSocket.OPEN;
-        if (fireConfirmationSent.current) socket?.send("confirm");
-      }
-      return;
-    }
+    if (fireAlert?.latched_alarm === false) return;
     fireAckPendingRef.current = true;
-    closeFireAfterSilence.current = closeAfter;
-    fireConfirmationSent.current = false;
     setFireAckPending(true);
     const confirmed = await controlPi(false);
     if (!confirmed) {
       fireAckPendingRef.current = false;
-      closeFireAfterSilence.current = false;
-      fireConfirmationSent.current = false;
       setFireAckPending(false);
     }
+  }
+
+  async function confirmFireAlert() {
+    const alert = fireAlert;
+    fireAlertDismissed.current = true;
+    window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
+    setFireAlert(null);
+    if (alert?.latched_alarm) await controlPi(false);
+    const socket = fireStatusSocket.current;
+    if (socket?.readyState === WebSocket.OPEN) socket.send("confirm");
   }
 
   async function controlServo(angle: number) {
@@ -485,10 +468,10 @@ export default function Dashboard() {
               Bitte Livebild kontrollieren und bei Gefahr sofort reagieren.
             </span>
             <div className="fire-alert-actions">
-              <button className="fire-silence" type="button" disabled={fireAckPending || !fireAlert.latched_alarm} onClick={() => silenceFireAlarm(false)}>
+              <button className="fire-silence" type="button" disabled={fireAckPending || !fireAlert.latched_alarm} onClick={silenceFireAlarm}>
                 {fireAlert.latched_alarm ? "Buzzer AUS" : "Buzzer ist aus"}
               </button>
-              <button type="button" autoFocus disabled={fireAckPending} onClick={() => silenceFireAlarm(true)}>
+              <button type="button" autoFocus disabled={fireAckPending} onClick={confirmFireAlert}>
                 {fireAckPending ? "Wird bestätigt …" : "Alarm bestätigen"}
               </button>
             </div>
