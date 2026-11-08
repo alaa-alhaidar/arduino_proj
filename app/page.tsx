@@ -101,6 +101,7 @@ export default function Dashboard() {
   const cameraObjectUrl = useRef<string | null>(null);
   const fireStatusSocket = useRef<WebSocket | null>(null);
   const fireAckPendingRef = useRef(false);
+  const closeFireAfterSilence = useRef(false);
   const fireAlertDismissed = useRef(false);
   const cameraOnline = devices.some((device) =>
     device.online && /cam|kamera/i.test(`${device.name} ${device.hostname}`));
@@ -170,10 +171,14 @@ export default function Dashboard() {
             // geöffnet. Der inaktive Status schaltet nur die nächste
             // Alarmepisode wieder frei.
             fireAlertDismissed.current = false;
+            const closeAlert = fireAckPendingRef.current && closeFireAfterSilence.current;
+            setFireAlert((current) => closeAlert
+              ? null
+              : current ? { ...current, latched_alarm: false } : current);
             if (fireAckPendingRef.current) {
               fireAckPendingRef.current = false;
+              closeFireAfterSilence.current = false;
               setFireAckPending(false);
-              setFireAlert(null);
             }
           } else if (!fireAlertDismissed.current) {
             setFireAlert(status);
@@ -183,6 +188,7 @@ export default function Dashboard() {
         socket.onclose = () => {
           if (fireStatusSocket.current === socket) fireStatusSocket.current = null;
           fireAckPendingRef.current = false;
+          closeFireAfterSilence.current = false;
           setFireAckPending(false);
           if (!disposed) reconnectTimer = window.setTimeout(connectFireStatus, 2000);
         };
@@ -397,13 +403,22 @@ export default function Dashboard() {
     link.remove();
   }
 
-  async function acknowledgeFireAlarm() {
+  async function silenceFireAlarm(closeAfter: boolean) {
     if (fireAckPendingRef.current) return;
+    if (fireAlert?.latched_alarm === false) {
+      if (closeAfter) {
+        fireAlertDismissed.current = true;
+        setFireAlert(null);
+      }
+      return;
+    }
     fireAckPendingRef.current = true;
+    closeFireAfterSilence.current = closeAfter;
     setFireAckPending(true);
     const confirmed = await controlPi(false);
     if (!confirmed) {
       fireAckPendingRef.current = false;
+      closeFireAfterSilence.current = false;
       setFireAckPending(false);
     }
   }
@@ -440,9 +455,14 @@ export default function Dashboard() {
               Die Kamera-KI hat Feuer in {fireAlert.positives} von {fireAlert.window_size} Prüfungen erkannt.
               Bitte Livebild kontrollieren und bei Gefahr sofort reagieren.
             </span>
-            <button type="button" autoFocus disabled={fireAckPending} onClick={acknowledgeFireAlarm}>
-              {fireAckPending ? "Wird ausgeschaltet …" : "AUS – Alarm bestätigen"}
-            </button>
+            <div className="fire-alert-actions">
+              <button className="fire-silence" type="button" disabled={fireAckPending || !fireAlert.latched_alarm} onClick={() => silenceFireAlarm(false)}>
+                {fireAlert.latched_alarm ? "Buzzer AUS" : "Buzzer ist aus"}
+              </button>
+              <button type="button" autoFocus disabled={fireAckPending} onClick={() => silenceFireAlarm(true)}>
+                {fireAckPending ? "Wird bestätigt …" : "Alarm bestätigen"}
+              </button>
+            </div>
           </section>
         </div>
       )}
@@ -633,8 +653,12 @@ export default function Dashboard() {
         .fire-alert p { margin: 16px 0 7px; color: #ffd1cd; font: 800 11px monospace; letter-spacing: 1.6px; }
         .fire-alert h2 { margin: 0; font: 800 30px Manrope,sans-serif; }
         .fire-alert span { display: block; margin: 14px 0 22px; color: #ffe9e7; font-size: 14px; line-height: 1.55; }
+        .fire-alert-actions { display: grid; grid-template-columns: 1fr 1.35fr; gap: 10px; }
         .fire-alert button { width: 100%; min-height: 46px; border: 0; border-radius: 9px; color: #801717; background: #fff; font-weight: 800; }
+        .fire-alert button.fire-silence { color: #fff; background: #621010; border: 1px solid #e47770; }
+        .fire-alert button:disabled { opacity: .58; cursor: not-allowed; }
         .fire-alert button:focus-visible { outline: 4px solid #ffd45c; outline-offset: 3px; }
+        @media (max-width: 480px) { .fire-alert-actions { grid-template-columns: 1fr; } }
         .sensor-card.alarm { background: #ffd9d9; border: 2px solid #dc2626; box-shadow: 0 4px 20px rgba(190, 34, 34, .24); }
         .sensor-card.alarm .sensor-icon { color: #fff; background: #d93636; }
         .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
