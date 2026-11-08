@@ -14,7 +14,7 @@ type Range = { min: number; max: number };
 type Ranges = Record<keyof Measurements, Range>;
 type ChartPoint = { value: number; receivedAt: number };
 type IoTDevice = { ip: string; name: string; hostname: string; online: boolean; lastChecked: string };
-type FireStatus = { alarm: boolean; latched_alarm: boolean; confidence: number; positives: number; window_size: number };
+type FireStatus = { alarm: boolean; latched_alarm: boolean; notification_active: boolean; confidence: number; positives: number; window_size: number };
 const CHART_WINDOW_MS = 10 * 60_000;
 const SENSOR_POLL_MS = 10_000;
 const FIRE_ALERT_STORAGE_KEY = "sensor-campus-fire-alert";
@@ -103,6 +103,7 @@ export default function Dashboard() {
   const fireStatusSocket = useRef<WebSocket | null>(null);
   const fireAckPendingRef = useRef(false);
   const closeFireAfterSilence = useRef(false);
+  const fireConfirmationSent = useRef(false);
   const fireAlertDismissed = useRef(false);
   const cameraOnline = devices.some((device) =>
     device.online && /cam|kamera/i.test(`${device.name} ${device.hostname}`));
@@ -176,31 +177,28 @@ export default function Dashboard() {
         socket.onmessage = (event) => {
           if (disposed || typeof event.data !== "string") return;
           const status = JSON.parse(event.data) as FireStatus;
-          if (!status.latched_alarm) {
-            // Ein bereits sichtbarer Alarm bleibt bis zur manuellen Bestätigung
-            // geöffnet. Der inaktive Status schaltet nur die nächste
-            // Alarmepisode wieder frei.
-            fireAlertDismissed.current = false;
-            const closeAlert = fireAckPendingRef.current && closeFireAfterSilence.current;
-            setFireAlert((current) => {
-              if (closeAlert) {
-                fireAlertDismissed.current = true;
-                window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
-                return null;
-              }
-              if (!current) return current;
-              const persistentAlert = { ...current, latched_alarm: false };
-              window.localStorage.setItem(FIRE_ALERT_STORAGE_KEY, JSON.stringify(persistentAlert));
-              return persistentAlert;
-            });
+          if (!status.notification_active) {
+            fireAlertDismissed.current = true;
+            window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
+            setFireAlert(null);
             if (fireAckPendingRef.current) {
               fireAckPendingRef.current = false;
               closeFireAfterSilence.current = false;
+              fireConfirmationSent.current = false;
               setFireAckPending(false);
             }
-          } else if (!fireAlertDismissed.current) {
+          } else {
             window.localStorage.setItem(FIRE_ALERT_STORAGE_KEY, JSON.stringify(status));
             setFireAlert(status);
+            if (fireAckPendingRef.current && !status.latched_alarm) {
+              if (closeFireAfterSilence.current && !fireConfirmationSent.current) {
+                fireConfirmationSent.current = true;
+                socket?.send("confirm");
+              } else if (!closeFireAfterSilence.current) {
+                fireAckPendingRef.current = false;
+                setFireAckPending(false);
+              }
+            }
           }
         };
         socket.onerror = () => socket?.close();
@@ -208,6 +206,7 @@ export default function Dashboard() {
           if (fireStatusSocket.current === socket) fireStatusSocket.current = null;
           fireAckPendingRef.current = false;
           closeFireAfterSilence.current = false;
+          fireConfirmationSent.current = false;
           setFireAckPending(false);
           if (!disposed) reconnectTimer = window.setTimeout(connectFireStatus, 2000);
         };
@@ -426,19 +425,24 @@ export default function Dashboard() {
     if (fireAckPendingRef.current) return;
     if (fireAlert?.latched_alarm === false) {
       if (closeAfter) {
-        fireAlertDismissed.current = true;
-        window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
-        setFireAlert(null);
+        fireAckPendingRef.current = true;
+        closeFireAfterSilence.current = true;
+        setFireAckPending(true);
+        const socket = fireStatusSocket.current;
+        fireConfirmationSent.current = socket?.readyState === WebSocket.OPEN;
+        if (fireConfirmationSent.current) socket?.send("confirm");
       }
       return;
     }
     fireAckPendingRef.current = true;
     closeFireAfterSilence.current = closeAfter;
+    fireConfirmationSent.current = false;
     setFireAckPending(true);
     const confirmed = await controlPi(false);
     if (!confirmed) {
       fireAckPendingRef.current = false;
       closeFireAfterSilence.current = false;
+      fireConfirmationSent.current = false;
       setFireAckPending(false);
     }
   }

@@ -51,16 +51,20 @@ fire_ws_clients: set[ServerConnection] = set()
 fire_detector = FireDetector()
 
 
-def load_fire_alarm() -> tuple[bool, bool]:
+def load_fire_alarm() -> tuple[bool, bool, bool]:
     try:
         state = json.loads(FIRE_ALARM_STATE_FILE.read_text(encoding="utf-8"))
-        return state.get("latched") is True, state.get("acknowledged") is True
+        latched = state.get("latched") is True
+        notification = state.get("notification_active") is True
+        if "notification_active" not in state:
+            notification = latched
+        return latched, state.get("acknowledged") is True, notification
     except (OSError, ValueError, TypeError, AttributeError):
-        return False, False
+        return False, False, False
 
 
 fire_alarm_lock = threading.Lock()
-fire_alarm_latched, fire_alarm_acknowledged = load_fire_alarm()
+fire_alarm_latched, fire_alarm_acknowledged, fire_notification_active = load_fire_alarm()
 
 
 class FireAlarmPublisher:
@@ -87,7 +91,11 @@ class FireAlarmPublisher:
             command = json.loads(message.payload.decode("utf-8"))
             if command.get("source") == "fire-ai" and isinstance(command.get("enabled"), bool):
                 enabled = command["enabled"]
-                store_fire_alarm(enabled, acknowledged=not enabled)
+                store_fire_alarm(
+                    enabled,
+                    acknowledged=not enabled,
+                    notification_active=True if enabled else None,
+                )
         except (UnicodeError, json.JSONDecodeError, AttributeError):
             pass
 
@@ -112,24 +120,41 @@ class FireAlarmPublisher:
 fire_alarm_publisher = FireAlarmPublisher()
 
 
-def store_fire_alarm(enabled: bool, acknowledged: bool | None = None) -> None:
-    global fire_alarm_latched, fire_alarm_acknowledged
+def store_fire_alarm(
+    enabled: bool,
+    acknowledged: bool | None = None,
+    notification_active: bool | None = None,
+) -> None:
+    global fire_alarm_latched, fire_alarm_acknowledged, fire_notification_active
     with fire_alarm_lock:
         fire_alarm_latched = enabled
         if acknowledged is not None:
             fire_alarm_acknowledged = acknowledged
+        if notification_active is not None:
+            fire_notification_active = notification_active
         FIRE_ALARM_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
         temporary = FIRE_ALARM_STATE_FILE.with_suffix(".tmp")
         temporary.write_text(json.dumps({
             "latched": enabled,
             "acknowledged": fire_alarm_acknowledged,
+            "notification_active": fire_notification_active,
         }), encoding="utf-8")
         temporary.replace(FIRE_ALARM_STATE_FILE)
 
 
 def set_fire_alarm(enabled: bool) -> None:
-    store_fire_alarm(enabled, acknowledged=not enabled)
+    store_fire_alarm(
+        enabled,
+        acknowledged=not enabled,
+        notification_active=True if enabled else None,
+    )
     fire_alarm_publisher.publish(enabled)
+
+
+def confirm_fire_notification() -> None:
+    if fire_alarm_latched:
+        set_fire_alarm(False)
+    store_fire_alarm(False, acknowledged=True, notification_active=False)
 
 
 def fire_status() -> dict[str, object]:
@@ -137,6 +162,7 @@ def fire_status() -> dict[str, object]:
     with fire_alarm_lock:
         status["latched_alarm"] = fire_alarm_latched
         status["alarm_acknowledged"] = fire_alarm_acknowledged
+        status["notification_active"] = fire_notification_active
     return status
 
 
@@ -237,8 +263,8 @@ async def websocket_handler(connection: ServerConnection) -> None:
         try:
             await connection.send(json.dumps(fire_status()))
             async for message in connection:
-                if message == "acknowledge":
-                    set_fire_alarm(False)
+                if message in {"acknowledge", "confirm"}:
+                    confirm_fire_notification()
                     await connection.send(json.dumps(fire_status()))
         finally:
             fire_ws_clients.discard(connection)
