@@ -177,7 +177,7 @@ export default function Dashboard() {
         socket.onmessage = (event) => {
           if (disposed || typeof event.data !== "string") return;
           const status = JSON.parse(event.data) as FireStatus;
-          if (!status.notification_active) {
+          if (status.notification_active === false) {
             fireAlertDismissed.current = true;
             window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
             setFireAlert(null);
@@ -187,7 +187,7 @@ export default function Dashboard() {
               fireConfirmationSent.current = false;
               setFireAckPending(false);
             }
-          } else {
+          } else if (status.notification_active === true) {
             window.localStorage.setItem(FIRE_ALERT_STORAGE_KEY, JSON.stringify(status));
             setFireAlert(status);
             if (fireAckPendingRef.current && !status.latched_alarm) {
