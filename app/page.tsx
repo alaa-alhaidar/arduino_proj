@@ -186,8 +186,13 @@ export default function Dashboard() {
             }
           } else if (status.notification_active === true) {
             if (!fireAlertDismissed.current) {
-              window.localStorage.setItem(FIRE_ALERT_STORAGE_KEY, JSON.stringify(status));
-              setFireAlert(status);
+              setFireAlert((current) => {
+                const persistentAlert = current
+                  ? { ...current, latched_alarm: status.latched_alarm }
+                  : status;
+                window.localStorage.setItem(FIRE_ALERT_STORAGE_KEY, JSON.stringify(persistentAlert));
+                return persistentAlert;
+              });
             }
             if (fireAckPendingRef.current && !status.latched_alarm) {
               fireAckPendingRef.current = false;
@@ -464,8 +469,8 @@ export default function Dashboard() {
             <p>KI-FEUERERKENNUNG</p>
             <h2 id="fire-alert-title">Feuer erkannt!</h2>
             <span id="fire-alert-description">
-              Die Kamera-KI hat Feuer in {fireAlert.positives} von {fireAlert.window_size} Prüfungen erkannt.
-              Bitte Livebild kontrollieren und bei Gefahr sofort reagieren.
+              Die Kamera-KI hat ein bestätigtes Feuerereignis erkannt.
+              Bitte Livebild und Umgebung kontrollieren und bei Gefahr sofort reagieren.
             </span>
             <div className="fire-alert-actions">
               <button className="fire-silence" type="button" disabled={fireAckPending || !fireAlert.latched_alarm} onClick={silenceFireAlarm}>
