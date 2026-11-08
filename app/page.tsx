@@ -178,9 +178,14 @@ export default function Dashboard() {
           if (disposed || typeof event.data !== "string") return;
           const status = JSON.parse(event.data) as FireStatus;
           if (status.notification_active === false) {
-            fireAlertDismissed.current = true;
-            window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
-            setFireAlert(null);
+            const confirmedByUser = fireAckPendingRef.current && closeFireAfterSilence.current;
+            if (confirmedByUser) {
+              fireAlertDismissed.current = true;
+              window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
+              setFireAlert(null);
+            } else {
+              setFireAlert((current) => current ? { ...current, latched_alarm: false } : current);
+            }
             if (fireAckPendingRef.current) {
               fireAckPendingRef.current = false;
               closeFireAfterSilence.current = false;
