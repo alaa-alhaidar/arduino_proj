@@ -78,6 +78,7 @@ security_alarm_active = False
 security_alarm_status = "offline"
 hardware_muted = False
 offline_sensors = []
+sensor_states = None
 last_measurement_at = None
 status_lock = threading.RLock()
 status_stopping = False
@@ -214,29 +215,52 @@ def update_alarm_output():
         alarm_signalling = desired_mode != "off"
 
 
-def load_offline_sensors(path):
+def load_sensor_states(path):
     with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=0.5)) as db:
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if not {'devices', 'registered_sensors'} <= tables:
             return []
-        return [{'ip': ip, 'name': name} for ip, name in db.execute(
-            "SELECT r.ip,r.name FROM registered_sensors r JOIN devices d ON d.ip=r.ip "
-            "WHERE r.enabled=1 AND (d.online=0 OR d.ping='keine Antwort') ORDER BY r.ip")]
+        return [
+            {'ip': ip, 'name': name, 'online': bool(online) and ping != 'keine Antwort'}
+            for ip, name, online, ping in db.execute(
+                "SELECT r.ip,r.name,COALESCE(d.online,0),d.ping "
+                "FROM registered_sensors r LEFT JOIN devices d ON d.ip=r.ip "
+                "WHERE r.enabled=1 ORDER BY r.ip"
+            )
+        ]
 
 
 def check_network_alarm():
-    global network_timer, network_alarm_active, offline_sensors
+    global network_timer, network_alarm_active, offline_sensors, sensor_states
     try:
-        current = load_offline_sensors(MONITOR_DB)
+        current_states = load_sensor_states(MONITOR_DB)
     except (OSError, sqlite3.Error):
-        current = None  # A transient read failure must not clear an active offline alarm.
+        current_states = None  # A transient read failure must not clear an active offline alarm.
     with status_lock:
         if status_stopping:
             return
-        if current is not None:
-            changed = current != offline_sensors
-            offline_sensors = current
-            network_alarm_active = bool(current)
+        if current_states is not None:
+            previous = {
+                item['ip']: item['online'] for item in sensor_states or []
+            }
+            for sensor in current_states:
+                if sensor_states is None or previous.get(sensor['ip']) != sensor['online']:
+                    state = "online" if sensor['online'] else "offline"
+                    log_event(
+                        "sensor",
+                        "info" if sensor['online'] else "warning",
+                        f"sensor_{state}",
+                        f"{sensor['name']} ist {state}",
+                        {'ip': sensor['ip'], 'name': sensor['name']},
+                    )
+            current_offline = [
+                {'ip': item['ip'], 'name': item['name']}
+                for item in current_states if not item['online']
+            ]
+            changed = current_offline != offline_sensors
+            sensor_states = current_states
+            offline_sensors = current_offline
+            network_alarm_active = bool(current_offline)
             update_alarm_output()
             if changed:
                 write_tolerance_state()
@@ -378,13 +402,6 @@ def handle_telemetry(message):
             status_timer.daemon = True
             status_timer.start()
         measurements = payload["measurements"]
-        log_event(
-            "sensor",
-            "info",
-            "measurement",
-            "Neue Sensormessung empfangen",
-            measurements,
-        )
         configured_ranges = load_ranges()
         if configured_ranges is not None:
             ranges = configured_ranges
