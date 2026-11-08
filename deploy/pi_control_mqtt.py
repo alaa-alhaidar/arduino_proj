@@ -9,6 +9,8 @@ import subprocess
 
 import paho.mqtt.client as mqtt
 
+from pi_event_log import recent_events
+
 
 TOKEN = os.environ["PI_CONTROL_TOKEN"]
 MQTT_HOST = os.getenv(
@@ -117,6 +119,8 @@ def handle_command(client, payload):
                 data = connected_devices()
             elif action == "alarm_state":
                 data = alarm_state()
+            elif action == "events":
+                data = {"events": recent_events(100)}
             elif action in {"start", "stop"}:
                 data = control_services(client, action)
             else:

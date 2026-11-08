@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { connectAsync } from "mqtt";
 
-export type PiAction = "start" | "stop" | "status" | "devices" | "alarm_state";
+export type PiAction = "start" | "stop" | "status" | "devices" | "alarm_state" | "events";
 
 export async function requestPi<T>(action: PiAction): Promise<T> {
   const token = process.env.PI_CONTROL_TOKEN;

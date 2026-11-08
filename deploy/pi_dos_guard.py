@@ -22,6 +22,8 @@ from typing import Deque
 
 import paho.mqtt.client as mqtt
 
+from pi_event_log import log_event
+
 
 LISTEN_HOST = os.getenv("DOS_GUARD_HOST", "0.0.0.0")
 LISTEN_PORT = int(os.getenv("DOS_GUARD_PORT", "8088"))
@@ -129,6 +131,7 @@ class DosGuard:
             updated_at=utc_now(),
         )
         self.last_publish = 0.0
+        self.last_logged_status: str | None = None
         self.firewall = Firewall(LISTEN_PORT, ENFORCEMENT_ENABLED)
         self.mqtt = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.mqtt.tls_set(ca_certs=MQTT_CA_FILE)
@@ -143,6 +146,25 @@ class DosGuard:
             return
         self.last_publish = now
         self.state.updated_at = utc_now()
+        if self.state.status != self.last_logged_status:
+            severity = (
+                "critical" if self.state.status in {"attack", "blocked"}
+                else "warning" if self.state.status == "warning"
+                else "info"
+            )
+            log_event(
+                "dos",
+                severity,
+                f"dos_{self.state.status}",
+                f"DoS-Guard Status: {self.state.status}",
+                {
+                    "source_ip": self.state.source_ip,
+                    "requests_in_window": self.state.requests_in_window,
+                    "threshold": self.state.threshold,
+                    "mitigation": self.state.mitigation,
+                },
+            )
+            self.last_logged_status = self.state.status
         payload = json.dumps(asdict(self.state), separators=(",", ":"))
         try:
             STATE_FILE.parent.mkdir(parents=True, exist_ok=True)

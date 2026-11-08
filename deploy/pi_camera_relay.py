@@ -20,6 +20,7 @@ from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
 
 from pi_fire_detector import FireDetector
+from pi_event_log import log_event
 
 
 HOST = os.getenv("CAMERA_RELAY_HOST", "127.0.0.1")
@@ -91,11 +92,14 @@ class FireAlarmPublisher:
             command = json.loads(message.payload.decode("utf-8"))
             if command.get("source") == "fire-ai" and isinstance(command.get("enabled"), bool):
                 enabled = command["enabled"]
+                was_latched = fire_alarm_latched
                 store_fire_alarm(
                     enabled,
                     acknowledged=not enabled,
                     notification_active=True if enabled else None,
                 )
+                if was_latched and not enabled:
+                    log_event("fire", "info", "buzzer_silenced", "Feueralarm-Buzzer ausgeschaltet")
         except (UnicodeError, json.JSONDecodeError, AttributeError):
             pass
 
@@ -143,18 +147,24 @@ def store_fire_alarm(
 
 
 def set_fire_alarm(enabled: bool) -> None:
+    was_latched = fire_alarm_latched
     store_fire_alarm(
         enabled,
         acknowledged=not enabled,
         notification_active=True if enabled else None,
     )
     fire_alarm_publisher.publish(enabled)
+    if enabled and not was_latched:
+        log_event("fire", "critical", "fire_detected", "Feuer durch Kamera-KI bestätigt")
 
 
 def confirm_fire_notification() -> None:
+    was_active = fire_notification_active
     if fire_alarm_latched:
         set_fire_alarm(False)
     store_fire_alarm(False, acknowledged=True, notification_active=False)
+    if was_active:
+        log_event("fire", "info", "fire_confirmed", "Feueranzeige durch Benutzer bestätigt")
 
 
 def fire_status() -> dict[str, object]:

@@ -15,6 +15,7 @@ type Ranges = Record<keyof Measurements, Range>;
 type ChartPoint = { value: number; receivedAt: number };
 type IoTDevice = { ip: string; name: string; hostname: string; online: boolean; lastChecked: string };
 type FireStatus = { alarm: boolean; latched_alarm: boolean; notification_active: boolean; confidence: number; positives: number; window_size: number };
+type SystemEvent = { id: number; occurred_at: string; source: "sensor" | "fire" | "dos"; severity: "info" | "warning" | "critical"; event_type: string; message: string };
 const CHART_WINDOW_MS = 10 * 60_000;
 const SENSOR_POLL_MS = 10_000;
 const FIRE_ALERT_STORAGE_KEY = "sensor-campus-fire-alert";
@@ -99,6 +100,8 @@ export default function Dashboard() {
   const [servoError, setServoError] = useState<string | null>(null);
   const [fireAlert, setFireAlert] = useState<FireStatus | null>(null);
   const [fireAckPending, setFireAckPending] = useState(false);
+  const [systemEvents, setSystemEvents] = useState<SystemEvent[]>([]);
+  const [eventsError, setEventsError] = useState(false);
   const cameraObjectUrl = useRef<string | null>(null);
   const fireStatusSocket = useRef<WebSocket | null>(null);
   const fireAckPendingRef = useRef(false);
@@ -234,6 +237,23 @@ export default function Dashboard() {
     }
     loadDevices();
     const timer = window.setInterval(loadDevices, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    async function loadEvents() {
+      try {
+        const response = await fetch(`/api/events?t=${Date.now()}`, { cache: "no-store" });
+        const data = await response.json() as { events?: SystemEvent[] };
+        if (!response.ok || !Array.isArray(data.events)) throw new Error("No events");
+        setSystemEvents(data.events);
+        setEventsError(false);
+      } catch {
+        setEventsError(true);
+      }
+    }
+    loadEvents();
+    const timer = window.setInterval(loadEvents, 5000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -611,6 +631,28 @@ export default function Dashboard() {
             <div className="reading">{sensor.value}<small>{sensor.unit}</small></div>
             <Sparkline data={sensor.data} tone={sensor.tone} label={sensor.label} unit={sensor.unit} limits={sensor.limits} />
           </article>)}
+          <section className="system-log" aria-labelledby="system-log-title">
+            <header>
+              <div><strong id="system-log-title">SYSTEMPROTOKOLL</strong><small>Pi 5 · Sensoren · Feuer-KI · DoS-Guard</small></div>
+              <span>{eventsError ? "Nicht erreichbar" : `${systemEvents.length} Einträge`}</span>
+            </header>
+            <div className="system-log-scroll">
+              <table>
+                <thead><tr><th>Zeit</th><th>Quelle</th><th>Stufe</th><th>Ereignis</th></tr></thead>
+                <tbody>
+                  {systemEvents.map((event) => (
+                    <tr key={event.id}>
+                      <td>{new Date(event.occurred_at).toLocaleString("de-DE", { timeZone: "Europe/Berlin" })}</td>
+                      <td><span className={`event-source ${event.source}`}>{event.source === "sensor" ? "Sensor" : event.source === "fire" ? "Feuer" : "DoS"}</span></td>
+                      <td><span className={`event-severity ${event.severity}`}>{event.severity === "critical" ? "Kritisch" : event.severity === "warning" ? "Warnung" : "Info"}</span></td>
+                      <td>{event.message}</td>
+                    </tr>
+                  ))}
+                  {!systemEvents.length && <tr><td colSpan={4} className="system-log-empty">{eventsError ? "Protokoll nicht erreichbar" : "Noch keine Ereignisse vorhanden"}</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </section>
       </div>
       <div className="control-deck">
@@ -676,6 +718,22 @@ export default function Dashboard() {
         .sensor-card.alarm .sensor-heading, .sensor-card.alarm .reading { color: #b42323; }
         .sensor-card.alarm .meter { background: #f2caca; }
         .sensor-card.alarm .meter span { background: #d93636; }
+        .system-log { grid-column: 1 / -1; min-width: 0; overflow: hidden; border: 1px solid #dbe3eb; border-radius: 13px; background: #fff; box-shadow: 0 4px 16px rgba(21,54,88,.04); }
+        .system-log > header { min-height: 52px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e3e9ef; background: #f8fafc; }
+        .system-log > header div { display: flex; flex-direction: column; gap: 3px; }
+        .system-log > header strong { color: #22384e; font: 800 11px monospace; letter-spacing: 1px; }
+        .system-log > header small, .system-log > header span { color: #7c8997; font-size: 9px; }
+        .system-log-scroll { max-height: 230px; overflow: auto; }
+        .system-log table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; }
+        .system-log th { position: sticky; top: 0; z-index: 1; padding: 8px 10px; color: #637386; background: #eef3f7; font: 700 9px monospace; letter-spacing: .5px; }
+        .system-log td { padding: 8px 10px; border-top: 1px solid #edf1f4; color: #34475a; vertical-align: middle; }
+        .system-log td:first-child { width: 132px; white-space: nowrap; color: #718091; font-variant-numeric: tabular-nums; }
+        .system-log tr:hover td { background: #f8fbfd; }
+        .event-source, .event-severity { display: inline-flex; padding: 3px 6px; border-radius: 10px; font: 700 8px monospace; white-space: nowrap; }
+        .event-source.sensor { color: #256f58; background: #e5f6ef; }.event-source.fire { color: #a52720; background: #ffe6e2; }.event-source.dos { color: #6544a0; background: #eee8fb; }
+        .event-severity.info { color: #315c83; background: #e8f1f8; }.event-severity.warning { color: #805f00; background: #fff1bd; }.event-severity.critical { color: #a21f1f; background: #ffdede; }
+        .system-log-empty { height: 70px; text-align: center; color: #8a96a3!important; }
+        @media (max-width: 650px) { .system-log-scroll { max-height: 260px; }.system-log td:first-child { width: auto; }.system-log th,.system-log td { padding: 7px 6px; }.system-log > header small { display: none; } }
         .control-deck { width: min(760px, calc(100% - 32px)); margin: 18px auto 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
         .control-deck :global(.station-control) { width: auto; max-width: none; min-height: 92px; margin: 0; padding: 14px; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); }
         .industrial-control { min-width: 0; margin: 0; padding: 14px; background: #fff; border: 1px solid #cbd5df; border-radius: 12px; box-shadow: 0 5px 18px rgba(19,35,52,.08); display: flex; align-items: center; justify-content: space-between; gap: 12px; }

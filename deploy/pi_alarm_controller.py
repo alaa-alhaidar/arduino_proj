@@ -5,6 +5,7 @@ import math
 import os
 import signal
 import sqlite3
+import sys
 from contextlib import closing
 import threading
 from datetime import datetime, timezone
@@ -14,6 +15,9 @@ import time
 import paho.mqtt.client as mqtt
 from gpiozero import DigitalOutputDevice
 from gpiozero.pins.lgpio import LGPIOFactory
+
+sys.path.insert(0, "/home/alaa/pi-control")
+from pi_event_log import log_event
 
 
 MQTT_HOST = os.getenv("MQTT_HOST", "127.0.0.1")
@@ -374,6 +378,13 @@ def handle_telemetry(message):
             status_timer.daemon = True
             status_timer.start()
         measurements = payload["measurements"]
+        log_event(
+            "sensor",
+            "info",
+            "measurement",
+            "Neue Sensormessung empfangen",
+            measurements,
+        )
         configured_ranges = load_ranges()
         if configured_ranges is not None:
             ranges = configured_ranges
