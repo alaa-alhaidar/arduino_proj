@@ -162,8 +162,10 @@ export default function Dashboard() {
           if (disposed || typeof event.data !== "string") return;
           const status = JSON.parse(event.data) as FireStatus;
           if (!status.alarm) {
+            // Ein bereits sichtbarer Alarm bleibt bis zur manuellen Bestätigung
+            // geöffnet. Der inaktive Status schaltet nur die nächste
+            // Alarmepisode wieder frei.
             fireAlertDismissed.current = false;
-            setFireAlert(null);
           } else if (!fireAlertDismissed.current) {
             setFireAlert(status);
           }
