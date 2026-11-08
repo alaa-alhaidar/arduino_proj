@@ -17,6 +17,7 @@ type IoTDevice = { ip: string; name: string; hostname: string; online: boolean; 
 type FireStatus = { alarm: boolean; latched_alarm: boolean; confidence: number; positives: number; window_size: number };
 const CHART_WINDOW_MS = 10 * 60_000;
 const SENSOR_POLL_MS = 10_000;
+const FIRE_ALERT_STORAGE_KEY = "sensor-campus-fire-alert";
 
 function Sparkline({ data, tone, label, unit, limits }: { data: ChartPoint[]; tone: string; label: string; unit: string; limits?: Range }) {
   const width = 240;
@@ -152,6 +153,15 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(FIRE_ALERT_STORAGE_KEY);
+      if (saved) setFireAlert(JSON.parse(saved) as FireStatus);
+    } catch {
+      window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
     let disposed = false;
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
@@ -172,15 +182,24 @@ export default function Dashboard() {
             // Alarmepisode wieder frei.
             fireAlertDismissed.current = false;
             const closeAlert = fireAckPendingRef.current && closeFireAfterSilence.current;
-            setFireAlert((current) => closeAlert
-              ? null
-              : current ? { ...current, latched_alarm: false } : current);
+            setFireAlert((current) => {
+              if (closeAlert) {
+                fireAlertDismissed.current = true;
+                window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
+                return null;
+              }
+              if (!current) return current;
+              const persistentAlert = { ...current, latched_alarm: false };
+              window.localStorage.setItem(FIRE_ALERT_STORAGE_KEY, JSON.stringify(persistentAlert));
+              return persistentAlert;
+            });
             if (fireAckPendingRef.current) {
               fireAckPendingRef.current = false;
               closeFireAfterSilence.current = false;
               setFireAckPending(false);
             }
           } else if (!fireAlertDismissed.current) {
+            window.localStorage.setItem(FIRE_ALERT_STORAGE_KEY, JSON.stringify(status));
             setFireAlert(status);
           }
         };
@@ -408,6 +427,7 @@ export default function Dashboard() {
     if (fireAlert?.latched_alarm === false) {
       if (closeAfter) {
         fireAlertDismissed.current = true;
+        window.localStorage.removeItem(FIRE_ALERT_STORAGE_KEY);
         setFireAlert(null);
       }
       return;
