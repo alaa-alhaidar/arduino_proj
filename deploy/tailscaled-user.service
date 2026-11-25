@@ -1,0 +1,14 @@
+[Unit]
+Description=Tailscale userspace daemon for Sensor Campus
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/mkdir -p /home/alaa/.local/share/tailscale
+ExecStart=/home/alaa/.local/lib/tailscale/tailscaled --tun=userspace-networking --state=/home/alaa/.local/share/tailscale/tailscaled.state --socket=/home/alaa/.local/share/tailscale/tailscaled.sock
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

@@ -88,7 +88,7 @@ def alarm_state():
 
 def control_services(client, action):
     if action == "stop":
-        client.publish(TELEMETRY_CONTROL_TOPIC, "stop", qos=1, retain=True)
+        client.publish(TELEMETRY_CONTROL_TOPIC, "stop", qos=1, retain=False)
     result = subprocess.run(
         ["systemctl", "--user", action, *SERVICES],
         capture_output=True,
@@ -99,7 +99,7 @@ def control_services(client, action):
     if result.returncode:
         raise RuntimeError(result.stderr.strip() or "Dienstesteuerung fehlgeschlagen")
     if action == "start":
-        client.publish(TELEMETRY_CONTROL_TOPIC, "start", qos=1, retain=True)
+        client.publish(TELEMETRY_CONTROL_TOPIC, "start", qos=1, retain=False)
     return current_status()
 
 

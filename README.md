@@ -158,3 +158,5 @@ unter dem in `FIRE_MODEL_PATH` verwendeten Pfad. Herkunft und Lizenz stehen in
 Die öffentliche PWA benötigt `CAMERA_RELAY_URL` und dasselbe
 `CAMERA_VIEW_TOKEN`. Port 8767 wird über einen HTTPS-/WebSocket-Tunnel oder
 Reverse Proxy veröffentlicht; der Upload-Port 8766 bleibt im lokalen Netz.
+Servobefehle sendet das PWA-Backend authentifiziert als `POST /servo` mit
+einem JSON-Body wie `{ "angle": 90 }` an den öffentlichen Relay-Port.

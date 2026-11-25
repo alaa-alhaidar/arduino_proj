@@ -9,15 +9,12 @@ import json
 import os
 import threading
 import time
-from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import paho.mqtt.client as mqtt
-from websockets.asyncio.server import ServerConnection, serve
-from websockets.datastructures import Headers
-from websockets.http11 import Request, Response
+from aiohttp import WSMsgType, web
 
 from pi_fire_detector import FireDetector
 from pi_event_log import log_event
@@ -46,9 +43,9 @@ latest_frame_at = 0.0
 servo_lock = threading.Lock()
 servo_angle = 90
 ws_loop: asyncio.AbstractEventLoop | None = None
-ws_clients: set[ServerConnection] = set()
-ws_ready: set[ServerConnection] = set()
-fire_ws_clients: set[ServerConnection] = set()
+ws_clients: set[web.WebSocketResponse] = set()
+ws_ready: set[web.WebSocketResponse] = set()
+fire_ws_clients: set[web.WebSocketResponse] = set()
 fire_detector = FireDetector()
 
 
@@ -199,102 +196,105 @@ def ws_authorized(path: str) -> bool:
     return hmac.compare_digest(signature, expected)
 
 
-def servo_command(path: str) -> int | None:
-    parsed = urlsplit(path)
-    if parsed.path != "/servo":
-        return None
-    query = parse_qs(parsed.query)
+def no_store_json(payload: dict[str, object], status: int = 200) -> web.Response:
+    return web.json_response(payload, status=status, headers={"Cache-Control": "no-store"})
+
+
+async def public_health(_request: web.Request) -> web.Response:
+    with frame_lock:
+        frame_age = time.monotonic() - latest_frame_at if latest_frame else None
+    return no_store_json({
+        "ok": True,
+        "frame_available": frame_age is not None,
+        "frame_age_seconds": round(frame_age, 3) if frame_age is not None else None,
+        "websocket_clients": len(ws_clients),
+    })
+
+
+async def public_frame_upload(request: web.Request) -> web.Response:
+    global latest_frame, latest_frame_at
+    if not authorized(request.headers.get("Authorization"), UPLOAD_TOKEN):
+        return no_store_json({"error": "Nicht autorisiert"}, 401)
+    if request.content_type != "image/jpeg":
+        return no_store_json({"error": "Content-Type muss image/jpeg sein"}, 415)
+    content_length = request.content_length
+    if content_length is None or content_length < 4 or content_length > MAX_FRAME_BYTES:
+        return no_store_json({"error": "Ungültige Bildgröße"}, 413)
+    frame = await request.read()
+    if (len(frame) != content_length or not frame.startswith(b"\xff\xd8")
+            or not frame.endswith(b"\xff\xd9")):
+        return no_store_json({"error": "Ungültiges JPEG"}, 400)
+
+    with frame_lock:
+        latest_frame = frame
+        latest_frame_at = time.monotonic()
+    fire_detector.submit(frame)
+    await broadcast_frame(frame)
+    with servo_lock:
+        current_servo_angle = servo_angle
+    return no_store_json({
+        "ok": True,
+        "bytes": len(frame),
+        "servo_angle": current_servo_angle,
+        "fire": fire_status(),
+    }, 202)
+
+
+async def public_servo(request: web.Request) -> web.Response:
+    global servo_angle
+    if not authorized(request.headers.get("Authorization"), VIEW_TOKEN):
+        return no_store_json({"error": "Nicht autorisiert"}, 401)
+    if request.content_type != "application/json":
+        return no_store_json({"error": "Content-Type muss application/json sein"}, 415)
     try:
-        angle = int(query.get("angle", [""])[0])
-        expires = int(query.get("expires", [""])[0])
-    except ValueError:
-        return None
-    signature = query.get("signature", [""])[0]
-    now = int(time.time())
-    if angle < 0 or angle > 180 or expires < now or expires > now + 120:
-        return None
-    expected = hmac.new(
-        VIEW_TOKEN.encode(), f"/servo:{angle}:{expires}".encode(), hashlib.sha256
-    ).hexdigest()
-    return angle if hmac.compare_digest(signature, expected) else None
+        payload = await request.json()
+        angle = int(payload["angle"])
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+        return no_store_json({"error": "Winkel muss eine ganze Zahl sein"}, 400)
+    if angle < 0 or angle > 180:
+        return no_store_json({"error": "Winkel muss zwischen 0 und 180 liegen"}, 400)
+    with servo_lock:
+        servo_angle = angle
+    return no_store_json({"ok": True, "angle": servo_angle})
 
 
-def http_response(status: HTTPStatus, body: bytes, content_type: str) -> Response:
-    headers = Headers()
-    headers["Content-Type"] = content_type
-    headers["Content-Length"] = str(len(body))
-    headers["Cache-Control"] = "no-store"
-    return Response(status.value, status.phrase, headers, body)
+async def public_fire_status(request: web.Request) -> web.Response:
+    if not authorized(request.headers.get("Authorization"), VIEW_TOKEN):
+        return no_store_json({"error": "Nicht autorisiert"}, 401)
+    return no_store_json(fire_status())
 
 
-def websocket_request(_connection: ServerConnection, request: Request) -> Response | None:
-    parsed = urlsplit(request.path)
-    if parsed.path == "/health":
-        with frame_lock:
-            frame_age = time.monotonic() - latest_frame_at if latest_frame else None
-        body = json.dumps({
-            "ok": True,
-            "frame_available": frame_age is not None,
-            "frame_age_seconds": round(frame_age, 3) if frame_age is not None else None,
-            "websocket_clients": len(ws_clients),
-        }).encode()
-        return http_response(HTTPStatus.OK, body, "application/json; charset=utf-8")
-    if parsed.path == "/servo":
-        angle = servo_command(request.path)
-        if angle is None:
-            return http_response(HTTPStatus.UNAUTHORIZED, b'{"error":"Nicht autorisiert"}', "application/json")
-        global servo_angle
-        with servo_lock:
-            servo_angle = angle
-        body = json.dumps({"ok": True, "angle": servo_angle}).encode()
-        return http_response(HTTPStatus.OK, body, "application/json; charset=utf-8")
-    if parsed.path == "/frame":
-        if not authorized(request.headers.get("Authorization"), VIEW_TOKEN):
-            return http_response(HTTPStatus.UNAUTHORIZED, b'{"error":"Nicht autorisiert"}', "application/json")
-        with frame_lock:
-            frame = latest_frame
-            frame_age = time.monotonic() - latest_frame_at
-        if frame is None or frame_age > MAX_FRAME_AGE_SECONDS:
-            return http_response(HTTPStatus.SERVICE_UNAVAILABLE, b'{"error":"Kein aktuelles Kamerabild"}', "application/json")
-        return http_response(HTTPStatus.OK, frame, "image/jpeg")
-    if parsed.path == "/fire/status":
-        if not authorized(request.headers.get("Authorization"), VIEW_TOKEN):
-            return http_response(HTTPStatus.UNAUTHORIZED, b'{"error":"Nicht autorisiert"}', "application/json")
-        body = json.dumps(fire_status()).encode()
-        return http_response(HTTPStatus.OK, body, "application/json; charset=utf-8")
-    if not ws_authorized(request.path):
-        return http_response(HTTPStatus.UNAUTHORIZED, b"Nicht autorisiert", "text/plain; charset=utf-8")
-    return None
-
-
-async def websocket_handler(connection: ServerConnection) -> None:
-    if urlsplit(connection.request.path).path == "/fire/ws":
-        fire_ws_clients.add(connection)
-        try:
-            await connection.send(json.dumps(fire_status()))
-            async for message in connection:
-                if message in {"acknowledge", "confirm"}:
-                    confirm_fire_notification()
-                    await connection.send(json.dumps(fire_status()))
-        finally:
-            fire_ws_clients.discard(connection)
-        return
-
-    ws_clients.add(connection)
+async def public_websocket(request: web.Request) -> web.WebSocketResponse:
+    if not ws_authorized(request.path_qs):
+        raise web.HTTPUnauthorized(text="Nicht autorisiert")
+    socket = web.WebSocketResponse(compress=False, max_msg_size=MAX_FRAME_BYTES)
+    await socket.prepare(request)
+    fire_socket = request.path == "/fire/ws"
+    clients = fire_ws_clients if fire_socket else ws_clients
+    clients.add(socket)
     try:
-        with frame_lock:
-            frame = latest_frame
-            frame_age = time.monotonic() - latest_frame_at
-        if frame is not None and frame_age <= MAX_FRAME_AGE_SECONDS:
-            await connection.send(frame)
+        if fire_socket:
+            await socket.send_str(json.dumps(fire_status()))
         else:
-            ws_ready.add(connection)
-        async for message in connection:
-            if message == "next":
-                ws_ready.add(connection)
+            with frame_lock:
+                frame = latest_frame
+                frame_age = time.monotonic() - latest_frame_at
+            if frame is not None and frame_age <= MAX_FRAME_AGE_SECONDS:
+                await socket.send_bytes(frame)
+            else:
+                ws_ready.add(socket)
+        async for message in socket:
+            if message.type != WSMsgType.TEXT:
+                continue
+            if fire_socket and message.data in {"acknowledge", "confirm"}:
+                confirm_fire_notification()
+                await socket.send_str(json.dumps(fire_status()))
+            elif not fire_socket and message.data == "next":
+                ws_ready.add(socket)
     finally:
-        ws_clients.discard(connection)
-        ws_ready.discard(connection)
+        clients.discard(socket)
+        ws_ready.discard(socket)
+    return socket
 
 
 async def broadcast_frame(frame: bytes) -> None:
@@ -304,7 +304,7 @@ async def broadcast_frame(frame: bytes) -> None:
     for client in clients:
         ws_ready.discard(client)
     results = await asyncio.gather(
-        *(client.send(frame) for client in clients),
+        *(client.send_bytes(frame) for client in clients),
         return_exceptions=True,
     )
     for client, result in zip(clients, results):
@@ -335,7 +335,7 @@ async def broadcast_fire_status() -> None:
             if clients:
                 message = json.dumps(status)
                 results = await asyncio.gather(
-                    *(client.send(message) for client in clients),
+                    *(client.send_str(message) for client in clients),
                     return_exceptions=True,
                 )
                 for client, result in zip(clients, results):
@@ -347,21 +347,27 @@ async def broadcast_fire_status() -> None:
 async def run_websocket_server() -> None:
     global ws_loop
     ws_loop = asyncio.get_running_loop()
-    async with serve(
-        websocket_handler,
-        WS_HOST,
-        WS_PORT,
-        process_request=websocket_request,
-        compression=None,
-        max_size=MAX_FRAME_BYTES,
-    ):
-        print(f"Kamera-WebSocket hört auf ws://{WS_HOST}:{WS_PORT}/ws", flush=True)
-        status_task = asyncio.create_task(broadcast_fire_status())
-        try:
-            await asyncio.Future()
-        finally:
-            status_task.cancel()
-            await asyncio.gather(status_task, return_exceptions=True)
+    application = web.Application(client_max_size=MAX_FRAME_BYTES)
+    application.add_routes([
+        web.get("/health", public_health),
+        web.post("/frame", public_frame_upload),
+        web.post("/servo", public_servo),
+        web.get("/fire/status", public_fire_status),
+        web.get("/ws", public_websocket),
+        web.get("/fire/ws", public_websocket),
+    ])
+    runner = web.AppRunner(application, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, WS_HOST, WS_PORT)
+    await site.start()
+    print(f"Kamera-HTTP/WebSocket hört auf http://{WS_HOST}:{WS_PORT}", flush=True)
+    status_task = asyncio.create_task(broadcast_fire_status())
+    try:
+        await asyncio.Future()
+    finally:
+        status_task.cancel()
+        await asyncio.gather(status_task, return_exceptions=True)
+        await runner.cleanup()
 
 
 def start_websocket_server() -> None:
@@ -401,29 +407,10 @@ class CameraRelayHandler(BaseHTTPRequestHandler):
             self.send_json(200, fire_status())
             return
 
-        if self.path != "/frame":
-            self.send_json(404, {"error": "Nicht gefunden"})
-            return
-        if not authorized(self.headers.get("Authorization"), VIEW_TOKEN):
-            self.send_json(401, {"error": "Nicht autorisiert"})
-            return
-
-        with frame_lock:
-            frame = latest_frame
-            frame_age = time.monotonic() - latest_frame_at
-        if frame is None or frame_age > MAX_FRAME_AGE_SECONDS:
-            self.send_json(503, {"error": "Kein aktuelles Kamerabild"})
-            return
-
-        self.send_response(200)
-        self.send_header("Content-Type", "image/jpeg")
-        self.send_header("Content-Length", str(len(frame)))
-        self.send_header("Cache-Control", "no-store, max-age=0")
-        self.send_header("X-Frame-Age", f"{frame_age:.3f}")
-        self.end_headers()
-        self.wfile.write(frame)
+        self.send_json(404, {"error": "Nicht gefunden"})
 
     def do_POST(self) -> None:
+        """POST-Anfrage empfangen, prüfen und anhand des Pfads verarbeiten."""
         global latest_frame, latest_frame_at, servo_angle
 
         if self.path == "/servo":
@@ -473,13 +460,13 @@ class CameraRelayHandler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": "Ungültiges JPEG"})
             return
 
-        with frame_lock:
+        with frame_lock: # speichert das aktuelle Kamerabild, um es im JSON-Status zurückzugeben
             latest_frame = frame
             latest_frame_at = time.monotonic()
-        fire_detector.submit(frame)
+        fire_detector.submit(frame) # startet die KI-Feuererkennung im Hintergrund
         if ws_loop is not None:
             asyncio.run_coroutine_threadsafe(broadcast_frame(frame), ws_loop)
-        with servo_lock:
+        with servo_lock: # speichert den aktuellen Servo-Winkel, um ihn im JSON-Status zurückzugeben
             current_servo_angle = servo_angle
         self.send_json(202, {
             "ok": True,
